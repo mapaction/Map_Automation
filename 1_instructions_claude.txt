@@ -1,0 +1,24 @@
+I'm updating a script C:\Users\hmatc\Nextcloud\Projects\2026\2026-ven-001\GIS\7_Python\71_Jupyter\MapAction_Map_Automation_ArcPro_v29.ipyn . In my organisation, projects have a fixed file structure, which must be maintained for testing. I don't want to edit in place, because that folder is synced. Therefore, I want to copy the folder 2026-ven-001 and all descendants into the folder here, cmf_examples (so it will be cmf_examples/2026-ven-001/* ). However, the whole folder is very large (several tens of GB) and it is not necessary to copy across the entire folder. Instead we need to only copy the files that are used or mentioned by the Jupyter notebook (and the notebook itself). Do this for me.
+
+Important notes:
+1) Do not edit the source folder in any way. It is publicly synced.
+2) Before starting, summarise to me which files will be copied, so I can check your reasoning.
+3) If for some reason you need Python tools, there are conda environments and ArcGIS Pro also has an environment you could use.
+
+---
+
+Now, set up a git repo for this folder.
+
+Implement the following changes.
+
+1. The script is currently run as a Jupyter notebook. This is because, in my organisation, some users are not confident at running Python scripts, but they can open the script in ArcGIS Pro and run it easily.
+
+Let's refactor as a regular python script. In the end, we will loop back and make a Jupyter version as well, but not now.
+
+2. Whilst refactoring, there are some major improvements to be made. The code needs to be tidy and modular, with helpful comments where relevant. There are large blocks of text which make reference to the old ArcMap version. These were produced during conversion and are no longer necessary.
+
+3. Set ABS_ROOT automatically based on the scripts file location.
+
+4. Use a path library to avoid ugly sep addition.
+
+5. Important - respdict sets a load of variables but these are already automatically defined in our 

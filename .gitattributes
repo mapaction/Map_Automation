@@ -1,0 +1,5 @@
+# Store GIS and data files exactly as ArcGIS Pro writes them
+*.lyrx -text
+*.aprx binary
+*.json -text
+*.ipynb -text

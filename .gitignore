@@ -1,0 +1,18 @@
+# Test data: ~400 MB of GIS data, rebuilt from the live project with
+# tools/copy_test_data.py (see README.md)
+cmf_examples/*/GIS/2_Active_Data/
+
+# Script outputs
+cmf_examples/*/GIS/3_Mapping/33_Map_Projects/*
+cmf_examples/*/GIS/3_Mapping/34_Map_Products_MapAction/*
+!cmf_examples/*/GIS/3_Mapping/33_Map_Projects/.gitkeep
+!cmf_examples/*/GIS/3_Mapping/34_Map_Products_MapAction/.gitkeep
+
+# ArcGIS Pro and Python clutter
+__pycache__/
+*.pyc
+*.lock
+.backups/
+Index/
+GpMessages/
+.ipynb_checkpoints/
