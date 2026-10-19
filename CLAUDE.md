@@ -5,82 +5,102 @@ README.md first for the user-facing picture.
 
 ## Key facts
 
-- **Script:** `cmf_examples/2026-ven-001/GIS/7_Python/72_Scripts/721_Automation/map_automation_pro.py`
-  plus `map_automation_pro_config.py` (all user-editable settings).
-- **Reference:** `cmf_examples/2026-ven-001/GIS/7_Python/71_Jupyter/MapAction_Map_Automation_ArcPro_v29.ipynb`
-  is the notebook the script was refactored from. Don't edit it.
+- **Script:** `map_automation_pro.py` and `map_automation_pro_config.py`, at the
+  repo root. Each example project links to them with **symlinks** in
+  `cmf_examples/<project>/GIS/7_Python/71_Jupyter/map_automation/`. Edit the
+  root files only.
 - **Constraint:** standard library + ArcGIS Pro's `arcgispro-py3` env only
   (an organisational rule). No pip/conda packages in the script.
-- **Planned:** a Jupyter version for users who run code inside ArcGIS Pro.
-  Keep logic in functions so a notebook can import or reuse them;
-  `script_dir()` already falls back to the cwd when `__file__` is missing.
+- **Planned:** a Jupyter version, to live in the `71_Jupyter/map_automation/`
+  folder. Keep logic in functions so a notebook can reuse them.
+- **Symlinks on Windows:** Developer Mode is on, and `core.symlinks=true` is set
+  for this repo. Create links with `cmd /c mklink`; PowerShell 5.1's
+  `New-Item -ItemType SymbolicLink` still demands admin.
 
 ## The live project: never touch it
 
 `C:\Users\hmatc\Nextcloud\Projects\2026\2026-ven-001` is the live Venezuela
 project, synced to other people via Nextcloud. **Read only. Never write,
-edit, run the script against, or create files in it.**
-`cmf_examples/2026-ven-001` is a cut-down copy with the same structure,
-holding only what the script uses. `GIS/2_Active_Data` is git-ignored (about
-400 MB, and one file is over 100 MB); rebuild it with
-`python tools/copy_test_data.py`, which reads the files in
-`tools/test_data_manifest.txt` from the live project. If the script starts
-using a new file, add it to the manifest and copy it in the same way.
+edit, run the script against, or open its `.aprx` files with arcpy** (that can
+leave lock files). To read inside a live `.aprx`/`.pagx`, open it as a zip or
+JSON file instead.
+
+`cmf_examples/2026-ven-001` is a cut-down copy with the same structure.
+`GIS/2_Active_Data` is git-ignored; fill it with
+`python tools/copy_test_data.py` (reads the files in
+`tools/test_data_manifest.txt` from live). Files deliberately edited in the
+test copy are listed in README.md and in `LOCAL_CHANGES` in the tool, and are
+never overwritten. If the script starts using a new file, add it to the
+manifest.
 
 ## Running and testing
 
+The script asks three questions on stdin. For the standard test, pipe in the
+answers (UTM 19N, location map = same, layout 3 = `landscape_a3_marginalia_inside`):
+
 ```
-& "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\721_Automation\map_automation_pro.py
+Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
+"2", "19N", "0", "3" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
 ```
 
+- PowerShell piping adds a BOM; `ask()` strips it. Piping from Git Bash into
+  `propy.bat` has quoting problems, so use PowerShell.
+- The project is found by walking up from the script's **unresolved** path
+  (`Path(__file__).absolute()`, never `.resolve()`), so it must be run via
+  the symlink, or with `--project <folder>`.
 - arcpy needs ArcGIS Pro signed in. "The Product License has not been
   initialized" means the user must sign in to Pro; ask them.
-- MA901 takes about 12 seconds. `TEST_MODE = True` deletes the MA* output folders
-  first, so each run gives `v01`. Check the JPEG in
-  `GIS/3_Mapping/34_Map_Products_MapAction/MA901/v01/` by viewing it.
-- To inspect a built `.aprx` (broken links, definition queries, label
-  expressions, element text), open it with `arcpy.mp.ArcGISProject` in a
-  throwaway script outside the repo.
-- Testing mode refuses to run unless `TEST_ENVIRONMENT.txt` is in the
-  project root. Never create that file in a live project.
+- MA901 takes about 25 seconds. `TEST_MODE` deletes MA* outputs first, so each
+  run gives `v01`. View the JPEG in
+  `GIS/3_Mapping/34_Map_Products_MapAction/MA901/v01/` to check the result.
+- To inspect a built `.aprx` (broken links, definition queries, labels,
+  element text), use `arcpy.mp.ArcGISProject` in a throwaway script outside
+  the repo.
+- Testing mode refuses to run without `TEST_ENVIRONMENT.txt` in the project
+  root. Never create that file in a live project.
 
-## How the script finds things
+## How the script works
 
-- **Project root:** walks up from the script folder to the first folder
-  holding both `event_description.json` and `GIS/`. (`GIS/` itself holds a
-  blank `event_description.json` template, which must be skipped.)
-- **Folders:** come from `cmf_description.json`, plus the `3121_arcpro` /
+- **Project root:** the first folder above the script (or `--project`) that
+  holds both `event_description.json` and `GIS/`. (`GIS/` itself holds a blank
+  `event_description.json`, which is skipped.)
+- **Folders:** from `cmf_description.json`, plus the `3121_arcpro` /
   `321_arcpro` subfolders from the config.
-- **Event details:** come from `event_description.json`: ISO3, GLIDE number,
-  time zone, `language_iso2` (upper-cased, used for `ADM0_ES` /
-  `ADM1_ES` label fields), producer text, disclaimer, donor credit and JPEG
-  dpi. The country name is not in that file; it is read from the admin 0
-  data's `ADM0_<LANG>` field unless `COUNTRY_NAME` is set.
+- **Event details:** from `event_description.json`; `language_iso2` is
+  upper-cased for `ADM0_EN`-style fields. The country name comes from the
+  admin 0 data's `ADM0_<LANG>` field unless `COUNTRY_NAME` is set.
+- **Order of a run:** check the config; resolve the datasets (which may ask
+  questions); ask the projections and the layout (the layout question shows
+  the country's width/height ratio in the Main map projection); clear the old
+  outputs in test mode; then build each map.
+- **Building a map:**
+  1. `saveACopy` the template.
+  2. Delete its maps and layouts, then `importDocument(pagx)`. The `.pagx`
+     brings its own "Main map" and "Location map".
+  3. Add the layers and link them to the data. Save and reopen (label classes
+     only see the new data's fields after a reopen).
+  4. Set the projections, label language and country definition queries.
+  5. Zoom the frames, then fill the legend.
+  6. CIM styling: white backgrounds on the legend and on every
+     `CIMParagraphTextGraphic`; legend items hide layer names and headings.
+  7. Fill in the text elements, then export.
+- **Layer names** are set to the config keys (e.g. `admn_ad1_ln_all_reference`)
+  so they can be found again. That's why the legend hides layer names and
+  shows only the symbol labels.
 - **Data matching:** `<prefix><pattern>` is globbed in `2_Active_Data/<folder>`.
-  The prefix is the event ISO3, `wrl` (world) or `reg`. If several files
-  match, `PREFERRED_DATASETS` is checked first, then `PREFERRED_SUPPLIER`;
-  anything left is asked with `input()`, and a non-interactive run skips
-  the layer.
-- **MapAction data naming:**
-  `geoext_category_theme_geom_scale_source_permission_free.ext`. The scale
-  part is sometimes missing, so `data_source_of()` takes the part before
-  the permission code (`pp`, `hp`...; see the live project's
-  `2_Active_Data/200_data_name_lookup/`).
-- **Build order:** for each map, add and link the layers, save, close and
-  reopen, then set label languages and definition queries, zoom, and fill
-  in the text. The reopen is deliberate: label classes don't see the new
-  data's fields until then.
-- **Copies of the template:** made with `saveACopy`, not a file copy, so
-  the copy gets new internal IDs. Read-only flags are cleared on the copy.
+  If several files match, `PREFERRED_DATASETS` is checked first, then
+  `PREFERRED_SUPPLIER`, then the user is asked.
+- **Data naming:**
+  `geoext_category_theme_geom_scale_source_permission_free`. The source is
+  the part before the permission code (the scale part is sometimes missing).
+  `SOURCE_NAMES` maps source codes to the names shown on the map.
 
 ## Known gaps / open questions
 
-- No legend JPGs exist for `portrait_a3_marginalia_inside`. The
-  `LEGEND_IMAGE_POSITIONS` values are placeholders.
-- MA002 to MA004 are configured but untested by request. MA003/MA004 need
-  `admn_ad2_*`, `tran_rds_ln_natearth`, and the ad2 data, all of which are in
-  the test copy.
-- The `PREFERRED_DATASETS` choices were picked by Claude for testing and
-  should be confirmed with the user.
-- World countries have empty `ADM0_ES` for some features, which may matter if
-  the adx label expressions switch to `ADM0_<LANG>`. They currently use `[ROMNAM]`.
+- MA002 to MA004 are configured but untested by request.
+- The `PREFERRED_DATASETS` choices were picked by Claude for testing; confirm
+  them with the user.
+- The 50% opacity of the `carto_fea_py_all` mask was Claude's choice.
+- Venezuela's admin 1 and 2 data has no `_EN` name fields.
+- The `.pagx` files (June) may differ from the same-named layouts inside the
+  template `.aprx` (October). The script uses the `.pagx`.

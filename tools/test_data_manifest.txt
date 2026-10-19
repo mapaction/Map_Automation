@@ -218,6 +218,13 @@ GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/tran_rds_ln_natearth.lyrx
 GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/tran_rds_ln_natearth_prim-sec.lyrx
 GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/tran_rrd_ln_all.lyrx
 GIS/3_Mapping/32_Map_Templates/321_arcpro/arcpro_templates_automation_test.aprx
-GIS/7_Python/71_Jupyter/MapAction_Map_Automation_ArcPro_v29.ipynb
+GIS/3_Mapping/32_Map_Templates/321_arcpro/landscape_a0_marginalia_inside.pagx
+GIS/3_Mapping/32_Map_Templates/321_arcpro/landscape_a3_marginalia_bottom.pagx
+GIS/3_Mapping/32_Map_Templates/321_arcpro/landscape_a3_marginalia_inside.pagx
+GIS/3_Mapping/32_Map_Templates/321_arcpro/landscape_a3_marginalia_leftside.pagx
+GIS/3_Mapping/32_Map_Templates/321_arcpro/portrait_a0_marginalia_inside.pagx
+GIS/3_Mapping/32_Map_Templates/321_arcpro/portrait_a3_marginalia_bottom.pagx
+GIS/3_Mapping/32_Map_Templates/321_arcpro/portrait_a3_marginalia_inside.pagx
+Venezuela Data Scramble Sheet.url
 cmf_description.json
 event_description.json

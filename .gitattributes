@@ -3,3 +3,4 @@
 *.aprx binary
 *.json -text
 *.ipynb -text
+*.pagx -text

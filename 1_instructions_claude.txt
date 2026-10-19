@@ -15,10 +15,99 @@ Implement the following changes.
 
 Let's refactor as a regular python script. In the end, we will loop back and make a Jupyter version as well, but not now.
 
-2. Whilst refactoring, there are some major improvements to be made. The code needs to be tidy and modular, with helpful comments where relevant. There are large blocks of text which make reference to the old ArcMap version. These were produced during conversion and are no longer necessary.
+We must avoid using any libraries outside the standard library and the ArcGIS Pro python env. Again, it's a technical limitation imposed by out 
+
+2. Whilst refactoring, there are some major improvements to be made. The code needs to be tidy and modular, with helpful comments where relevant. There are large blocks of text which make reference to the old ArcMap version. These were produced during conversion and are no longer necessary. All references to MXDs need to be updated.
 
 3. Set ABS_ROOT automatically based on the scripts file location.
 
 4. Use a path library to avoid ugly sep addition.
 
-5. Important - respdict sets a load of variables but these are already automatically defined in our 
+5. Important - respdict sets a load of variables but these are already automatically defined in our standard file system, at the base, e.g. C:\Users\hmatc\Nextcloud\Projects\2026\2026-ven-001\event_description.json . Copy this file into the project at the right  location, and use that.
+
+6. Create a testing mode which deletes all outputs before starting. We'll run in testing  mode for now.
+
+7. You can uncomment the configs for maps MA002 etc, but we don't want to test those just yet.
+
+8. Write a README.md file (to explain the script and this testing environment to human users) and a CLAUDE.md file (to facilitate future Claude sessions). Be sure to explain the relationship with the live Venezuela folder (we're using the necessary subset of the data as a testing example to develop this script). 
+
+9. Test the script.
+
+---
+
+Ok. Now, returning to updating the repo.
+
+Note a few files may have been created when I opened the project in ArcGIS Pro (e.g. default gdb). These can be gitignored.
+
+Make these changes:
+
+1) The map has a mixture of English and Spanish. Everything should be in English: Country name title,  disclaimer, fields used for labels.
+
+2) We need to define a mapping between lowercase data sources (used in layer files and data files names) and uppercase (to be used in map marginalia). Define as a dict in a suitable location. Here they are:
+gmted GMTED
+ine INE
+mapaction MapAction
+naturalearth Natural Earth
+ourairports OurAirports
+un UN
+worldportindex World Port Index
+
+3) I'd like to rearrange the file structure. A symlink of scripts should live in its own folder in the Jupyter folder (in anticipation of converting back to Jupyter at some point). Delete the existing version there. But the real version of the scripts should live at the base of this repo (in anticipation that we might want to test it in other cmf_examples). 
+
+4) There's a layer carto_fea_py_all which isn't rendering properly. Copy in C:\Users\hmatc\Nextcloud\Projects\2026\2026-ven-001\GIS\2_Active_Data\207_carto\ven_carto_fea_py_mapaction_pp_faded_nationalboundary.shp (but keep the carto_fea_py_all filename).
+
+5) Prompt the user to enter projection informatio for the main map: either ArcGIS Pro default (lat/lon in WGS84), UTM code (prompt them to look in Data Scramble Sheet if not sure), or EPSG/ESRI string code. Use this as the projection for the main map. For this example, use UTM 19N.
+
+6) Use the same prompt for the projection for the inset map. Add one additional option at the start (use 0 as the key shortcut so the options aren't offset), to use the same projection as the main map. And for the example, we'll use that.
+
+7) Prompt the user to choose one of the layouts, based on the layouts available in the layouts folder (mention that, for initial maps, the layout should match the aspect ratio of the country. Let's use  landscape_a3_marginalia_leftside
+
+8) If possible, modify the lyrx file that labels surrounding countries (both in the main map and inside) to always exclude the following based on ISO code:
+Bird Island 
+Navassa Island
+
+9) We need to add a legend in the top left. The legend and all the text boxes on the map should have a white background. 
+
+10) Migrate this entire repo to C:\Users\hmatc\Documents\repos\Map_Automation
+
+
+--
+
+
+In CLAUDE.md and README.md, explain the role of an additional repo:
+
+
+
+
+
+The 
+
+
+
+
+---
+
+Get-ChildItem -Name C:\Users\hmatc\Documents\repos\default-crash-move-folder\20YYiso3nn\GIS\3_Mapping\32_Map_Templates\321_arcpro\
+
+arcpro_templates_automation_test.aprx
+landscape_a0.pagx
+landscape_a3.pagx
+landscape_tabloid.pagx
+portrait_a0.pagx
+portrait_a3.pagx
+portrait_tabloid.pagx
+
+Get-ChildItem -Name C:\Users\hmatc\Nextcloud\Projects\2026\2026-ven-001\GIS\3_Mapping\32_Map_Templates\321_arcpro\
+
+2025_multi
+20260602
+2026_options
+arcpro_templates.aprx
+arcpro_templates_automation_test.aprx
+landscape_a0_marginalia_inside.pagx
+landscape_a3_marginalia_bottom.pagx
+landscape_a3_marginalia_inside.pagx
+landscape_a3_marginalia_leftside.pagx
+portrait_a0_marginalia_inside.pagx
+portrait_a3_marginalia_bottom.pagx
+portrait_a3_marginalia_inside.pagx

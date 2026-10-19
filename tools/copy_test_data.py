@@ -1,16 +1,19 @@
-"""Rebuild the test data in cmf_examples/2026-ven-001 from the live project.
+"""Fill in the test data in cmf_examples/2026-ven-001 from the live project.
 
 Copies each file listed in test_data_manifest.txt (paths relative to the
 project root) from the live Nextcloud project into the test copy. The live
-project is only read, never written to. Files already present with the same
-size are skipped.
+project is only read, never written to.
+
+By default only missing files are copied. With --refresh, files whose size
+differs from the live copy are replaced too, except the files in
+LOCAL_CHANGES, which are deliberately different in the test copy.
 
 Usage (any Python 3.9+, no extra packages):
-    python tools/copy_test_data.py [LIVE_PROJECT_FOLDER]
+    python tools/copy_test_data.py [--refresh] [LIVE_PROJECT_FOLDER]
 """
 
+import argparse
 import shutil
-import sys
 from pathlib import Path
 
 DEFAULT_LIVE = Path.home() / "Nextcloud/Projects/2026/2026-ven-001"
@@ -18,29 +21,44 @@ REPO = Path(__file__).resolve().parent.parent
 TEST_PROJECT = REPO / "cmf_examples/2026-ven-001"
 MANIFEST = Path(__file__).resolve().parent / "test_data_manifest.txt"
 
+# Edited in the test copy (see README.md); never overwritten from the live project.
+LAYER_FILES = "GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/"
+LOCAL_CHANGES = {
+    "event_description.json",                         # switched to English
+    LAYER_FILES + "admn_adx_py_all_reference.lyrx",   # Bird / Navassa Island labels hidden
+    LAYER_FILES + "admn_adx_py_all_location.lyrx",    # Bird / Navassa Island labels hidden
+    LAYER_FILES + "carto_fea_py_all.lyrx",            # drawn as a faded mask
+}
+
 
 def main():
-    live = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_LIVE
-    if not live.is_dir():
-        raise SystemExit(f"Live project not found: {live}")
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("live", nargs="?", type=Path, default=DEFAULT_LIVE)
+    parser.add_argument("--refresh", action="store_true",
+                        help="also replace files that differ from the live project")
+    args = parser.parse_args()
+    if not args.live.is_dir():
+        raise SystemExit(f"Live project not found: {args.live}")
 
-    copied = skipped = 0
+    copied = kept = 0
     missing = []
     for line in MANIFEST.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
-        source, target = live / line, TEST_PROJECT / line
+        source, target = args.live / line, TEST_PROJECT / line
         if not source.is_file():
             missing.append(line)
             continue
-        if target.is_file() and target.stat().st_size == source.stat().st_size:
-            skipped += 1
-            continue
+        if target.is_file():
+            unchanged = target.stat().st_size == source.stat().st_size
+            if not args.refresh or unchanged or line in LOCAL_CHANGES:
+                kept += 1
+                continue
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
         copied += 1
 
-    print(f"Copied {copied}, already up to date {skipped}.")
+    print(f"Copied {copied}, kept {kept}.")
     if missing:
         print("Not found in the live project:")
         for line in missing:

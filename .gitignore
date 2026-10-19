@@ -8,7 +8,8 @@ cmf_examples/*/GIS/3_Mapping/34_Map_Products_MapAction/*
 !cmf_examples/*/GIS/3_Mapping/33_Map_Projects/.gitkeep
 !cmf_examples/*/GIS/3_Mapping/34_Map_Products_MapAction/.gitkeep
 
-# ArcGIS Pro and Python clutter
+# ArcGIS Pro and Python clutter (Pro creates 6_Pro_Default_Files when a project is opened)
+*/*/GIS/6_Pro_Default_Files/
 __pycache__/
 *.pyc
 *.lock
