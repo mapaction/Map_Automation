@@ -29,6 +29,7 @@ cmf_examples itself, or move the inner folder up a level.
 It should look like this (only the main folders are shown):
 
     Map_Automation\                      (the repository)
+      map_automation_pro.aprx
       map_automation_pro.ipynb
       map_automation_pro_lib.py
       map_automation_pro_config.py
@@ -57,8 +58,9 @@ event_description.json and the GIS folder must be directly inside
 3) Set up the symlinks
 ----------------------
 
-The notebook and its two Python files live at the top of the repository.
-Each example project needs links (symlinks) to them in its
+The notebook, its two Python files and the empty ArcGIS Pro project that
+is opened before the notebook (map_automation_pro.aprx) live at the top of
+the repository. Each example project needs links (symlinks) to them in its
 GIS\7_Python\71_Jupyter\map_automation folder, so it always runs the
 current version.
 
@@ -68,17 +70,23 @@ Settings > System > For developers > Developer Mode.
 Then, in PowerShell, from the repository folder (Map_Automation):
 
     Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
-    cmd /c mklink map_automation_pro.ipynb ..\..\..\..\..\..\map_automation_pro.ipynb
+    cmd /c mklink map_automation_pro.aprx ..\..\..\..\..\..\map_automation_pro.aprx
+    cmd /c mklink map_automation_pro.ipynb..\..\..\..\..\..\map_automation_pro.ipynb
     cmd /c mklink map_automation_pro_lib.py ..\..\..\..\..\..\map_automation_pro_lib.py
     cmd /c mklink map_automation_pro_config.py ..\..\..\..\..\..\map_automation_pro_config.py
     Get-ChildItem
 
-(The same three mklink lines work in a Command Prompt, without "cmd /c".
+(The same four mklink lines work in a Command Prompt, without "cmd /c".
 PowerShell's own New-Item -ItemType SymbolicLink needs admin rights, so use
 mklink.)
 
-Get-ChildItem should list the three files as links (mode "-a---l").
+Get-ChildItem should list the four files as links (mode "-a---l").
 For another example project, replace 2026-ven-001 with its folder name.
 
 Then run the test as described in the repository's README.md
-("Running the notebook").
+("Running the notebook"): in ArcGIS Pro, open map_automation_pro.aprx
+from that folder first, then the notebook from its Catalog pane.
+
+If ArcGIS Pro saves map_automation_pro.aprx (e.g. when closing it), the
+change goes through the link to the repository's copy. Discard it with
+"git restore map_automation_pro.aprx" unless the change is wanted.

@@ -17,6 +17,14 @@ README.md first for the user-facing picture.
   - `map_automation_pro_config.py`: settings.
   - The notebook is committed with no outputs. If it was run in Pro, clear
     them before committing (Pro saves outputs into the file via the symlink).
+  - `map_automation_pro.aprx`: an empty Pro project that users open before
+    the notebook. Pro runs a notebook in the open project's home folder,
+    not the notebook's folder, so without it the imports fail (found on the
+    first run in Pro). Made by `tools/make_notebook_project.py` (run with
+    `propy.bat`) from the test copy's template; paths relative to
+    `GIS/7_Python/71_Jupyter/map_automation`, no stored `homeFolder`.
+    Rebuild it rather than editing it. If Pro saved it through the symlink
+    (e.g. adding a notebook item), `git restore` it.
   - `cmf_examples/`: example projects, downloaded from Google Drive and not
     tracked by git (see "The test copy").
 - **Constraint:** standard library + ArcGIS Pro's `arcgispro-py3` env only
@@ -97,7 +105,8 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
 - PowerShell piping adds a BOM; `ask()` strips it. Piping from Git Bash into
   `propy.bat` has quoting problems, so use PowerShell.
 - The project is found by walking up from the working directory (in
-  Jupyter, the notebook's folder), then from the lib's **unresolved** path
+  Pro, the open project's home folder: the notebook's folder once
+  `map_automation_pro.aprx` is open), then from the lib's **unresolved** path
   (`Path(__file__).absolute()`, never `.resolve()`). So run from the symlink
   folder, or set `PROJECT_FOLDER` in the notebook's first code cell.
 - arcpy needs ArcGIS Pro signed in. "The Product License has not been
@@ -193,9 +202,18 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
 
 ## Known gaps / open questions
 
-- The notebook has only been run through `tools/run_notebook.py`, not yet
-  inside ArcGIS Pro (assumed: the kernel's working directory is the
-  notebook's folder, and `input()` prompts work). Ask the user to confirm.
+- The first run inside ArcGIS Pro (the live Venezuela project, which has a
+  plain copy of the script, with `TEST_MODE = False`, in
+  `GIS/7_Python/71_Jupyter/map_automation/`) failed with
+  `ModuleNotFoundError`: the kernel's working directory is the open
+  project's home folder. `map_automation_pro.aprx` is the fix; still to
+  confirm in Pro, along with `input()` prompts working. The live copy
+  doesn't update itself: after a fix, the user copies the changed files
+  across (writes to live need the user's say-so each time).
+- At release, the standard CMF also has an older
+  `71_Jupyter/blank_template_for_running_Jupyter_automation.aprx` (same
+  idea, but cluttered and with Myanmar paths); ask the user whether
+  `map_automation_pro.aprx` replaces it.
 
 - MA002 to MA004 are configured but untested by request.
 - The `PREFERRED_DATASETS` choices were picked by Claude for testing; confirm

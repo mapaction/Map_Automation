@@ -50,14 +50,17 @@ repository or to Venezuela.
 ## What is in this repository
 
 ```
+map_automation_pro.aprx        empty ArcGIS Pro project, opened before the
+                               notebook (see "Running the notebook")
 map_automation_pro.ipynb       the notebook users run, step by step
 map_automation_pro_lib.py      the functions behind the notebook
 map_automation_pro_config.py   settings: which maps, layers, testing mode...
 README.md, CLAUDE.md           this guide, and notes for Claude Code sessions
 tools/                         runs the notebook from the command line for
-                               testing; zips an example project for Google
-                               Drive; refreshes the test data from the live
-                               project; tidies the test copy's map template
+                               testing; makes map_automation_pro.aprx; zips
+                               an example project for Google Drive; refreshes
+                               the test data from the live project; tidies
+                               the test copy's map template
 cmf_examples/README.txt        download links and setup steps for the
                                example projects (not stored in git, see below)
 ```
@@ -85,7 +88,7 @@ cmf_examples/2026-ven-001/     test copy of the Venezuela project (see below)
   GIS/6_Pro_Default_Files/     empty default geodatabase and toolbox, copied
                                from the standard CMF; every new project uses them
   GIS/7_Python/71_Jupyter/map_automation/
-                               links (symlinks) to the three script files
+                               links (symlinks) to the four script files
 ```
 
 The script files are at the top of the repository, so the same notebook can
@@ -167,12 +170,29 @@ and is almost white about 35 mm from the border. The numbers are
 
 ## Running the notebook
 
-In ArcGIS Pro (signed in), open
-`GIS/7_Python/71_Jupyter/map_automation/map_automation_pro.ipynb` from the
-project's Catalog pane. Run its cells from the top, one at a time
-(Ctrl+Enter) or with **Run All Cells**. Each step has a short explanation
-above it. The notebook finds the project it sits in; to use a different
-project, set `PROJECT_FOLDER` in its first code cell.
+In ArcGIS Pro (signed in):
+
+1. Open the project
+   `GIS/7_Python/71_Jupyter/map_automation/map_automation_pro.aprx`. It is
+   empty: it is only there so the notebook runs in the right folder.
+2. In its Catalog pane, open **Folders > map_automation >
+   map_automation_pro.ipynb**.
+3. Run the cells from the top, one at a time (Ctrl+Enter) or with **Run All
+   Cells**. Each step has a short explanation above it.
+
+ArcGIS Pro runs a notebook from the open project's home folder (the folder
+of its `.aprx`), not from the notebook's own folder. Opening
+`map_automation_pro.aprx` makes that the notebook's folder, so the notebook
+finds `map_automation_pro_lib.py`, the settings and the project it sits in.
+If another project is open, the first cell stops with a message saying so.
+To build maps for a different project, set `PROJECT_FOLDER` in the first
+code cell.
+
+`map_automation_pro.aprx` is made by `tools/make_notebook_project.py` (run
+with `propy.bat`) from the test copy's map template, with the maps and
+layouts removed. Its paths are relative (default geodatabase and toolbox in
+`GIS/6_Pro_Default_Files`, home folder its own folder), so the same file
+works in any CMF.
 
 For testing, the notebook can also be run from the command line, with the
 answers to its questions piped in (PowerShell):
@@ -253,7 +273,9 @@ donor credit, JPEG resolution) come from the project's
 
 - **MA901** builds cleanly from the test data (about 40 seconds).
 - The notebook has been tested from the command line
-  (`tools/run_notebook.py`), but not yet run inside ArcGIS Pro.
+  (`tools/run_notebook.py`). The first try inside ArcGIS Pro (in the live
+  Venezuela project) failed because Pro ran it from another project's
+  folder; `map_automation_pro.aprx` is the fix, not yet tried in Pro.
 - The feather, default geodatabase and toolbox, project tidying and opening
   tabs are new; the tabs and tidying are checked with arcpy but not yet
   confirmed by opening the project in ArcGIS Pro.
