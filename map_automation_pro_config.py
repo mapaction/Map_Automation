@@ -51,6 +51,13 @@ LAYER_FILES_SUBFOLDER = "3121_arcpro"   # inside 312_Layer_files
 TEMPLATES_SUBFOLDER = "321_arcpro"      # inside 32_Map_Templates
 LAYER_FILE_EXT = ".lyrx"
 
+# Each new project's default geodatabase and toolbox: the empty placeholders
+# in the standard CMF's 6_Pro_Default_Files folder (relative to the project
+# root). Without them ArcGIS Pro asks for them every time a project is opened.
+PRO_DEFAULT_FILES_FOLDER = "GIS/6_Pro_Default_Files"
+DEFAULT_GEODATABASE = "MapActionDefault.gdb"
+DEFAULT_TOOLBOX = "Default.tbx"
+
 
 # --- Data selection ---------------------------------------------------------
 
@@ -136,6 +143,8 @@ LAYERS = [
     LayerSpec("admn_ad2_py_all_reference", "_admn_ad2_py_*_ine_pp*.shp", "202_admn", MAIN),
     LayerSpec("admn_adx_ln_all_reference", "_admn_adx_ln_*_pp*.shp", "202_admn", MAIN,
               prefix="world", exclude_affected_country=True),
+    # The feather's data is made by the script (see FEATHER_LAYER below), so
+    # its pattern and folder are not used to find data.
     LayerSpec("carto_fea_py_all", "_carto_fea_py_*_pp*.shp", "207_carto", MAIN),
     LayerSpec("admn_adx_py_all_reference", "_admn_adx_py_*_pp*.shp", "202_admn", MAIN, prefix="world"),
 
@@ -156,6 +165,27 @@ FRAME_EXTENTS = {
     MAIN: ("admn_ad0_py_all_thematic", 1),
     LOCATION: ("admn_ad0_py_all_location", 2),
 }
+
+# --- Feather (fades everything outside the affected country) -----------------
+# The feather layer's data is made fresh by the script, in the same way as
+# MapAction's Data Scramble toolbox (tool "2.1 Create Feather"): the admin 0
+# polygon used for the maps is erased from the global background polygon. The
+# result is saved in 2_Active_Data/207_carto with the toolbox's file name,
+#   <iso3>_carto_fea_py_mapaction_pp_faded_<admin 0 name ending>.shp
+# e.g. ven_carto_fea_py_mapaction_pp_faded_country.shp. An existing file is
+# reused if it is newer than both inputs (in TEST_MODE it is always remade).
+FEATHER_LAYER = "carto_fea_py_all"
+FEATHER_BACKGROUND = "207_carto/wrl_carto_ext_py_s0_esri_pp_globalBackground.shp"  # in 2_Active_Data
+
+# The feather's symbol replaces the layer file's: FEATHER_STEPS white fills,
+# each FEATHER_STEP_PT points further from the country's border and
+# FEATHER_STEP_OPACITY percent opaque. They add up, so the fade gets stronger
+# away from the border. These values are the ones used in the 2026-ven-001
+# response's maps (21 steps of 5 pt at 15%: almost white 100 pt, about 35 mm,
+# from the border).
+FEATHER_STEPS = 21
+FEATHER_STEP_PT = 5
+FEATHER_STEP_OPACITY = 15
 
 # The legend lists every Main map layer except these: background layers, and
 # layers whose symbol has no label (or repeats another layer's label).

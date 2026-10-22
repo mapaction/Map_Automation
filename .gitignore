@@ -8,8 +8,13 @@ cmf_examples/*/GIS/3_Mapping/34_Map_Products_MapAction/*
 !cmf_examples/*/GIS/3_Mapping/33_Map_Projects/.gitkeep
 !cmf_examples/*/GIS/3_Mapping/34_Map_Products_MapAction/.gitkeep
 
-# ArcGIS Pro and Python clutter (Pro creates 6_Pro_Default_Files when a project is opened)
-*/*/GIS/6_Pro_Default_Files/
+# ArcGIS Pro default files: keep the standard CMF's empty placeholders, ignore
+# anything else Pro puts there
+*/*/GIS/6_Pro_Default_Files/*
+!*/*/GIS/6_Pro_Default_Files/Default.tbx
+!*/*/GIS/6_Pro_Default_Files/MapActionDefault.gdb/
+
+# ArcGIS Pro and Python clutter
 __pycache__/
 *.pyc
 *.lock

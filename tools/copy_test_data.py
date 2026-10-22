@@ -27,7 +27,7 @@ LOCAL_CHANGES = {
     "event_description.json",                         # switched to English
     LAYER_FILES + "admn_adx_py_all_reference.lyrx",   # Bird / Navassa Island labels hidden
     LAYER_FILES + "admn_adx_py_all_location.lyrx",    # Bird / Navassa Island labels hidden
-    LAYER_FILES + "carto_fea_py_all.lyrx",            # drawn as a faded mask
+    "GIS/3_Mapping/32_Map_Templates/321_arcpro/arcpro_templates_automation_test.aprx",  # tidied by tools/clean_template.py
 }
 
 

@@ -21,13 +21,17 @@ Only the standard library and arcpy are used.
 import argparse
 import gc
 import json
+import os
 import re
 import shutil
 import stat
 import sys
 import time
+import uuid
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
 import arcpy
 
@@ -75,6 +79,7 @@ class ProjectPaths:
     templates: Path
     map_projects: Path
     map_exports: Path
+    pro_defaults: Path   # 6_Pro_Default_Files (default geodatabase and toolbox)
 
     @classmethod
     def from_root(cls, root):
@@ -95,7 +100,14 @@ class ProjectPaths:
             templates=folder("map_templates", "GIS/3_Mapping/32_Map_Templates") / cfg.TEMPLATES_SUBFOLDER,
             map_projects=folder("map_projects", "GIS/3_Mapping/33_Map_Projects"),
             map_exports=folder("export_dir", "GIS/3_Mapping/34_Map_Products_MapAction"),
+            pro_defaults=root / cfg.PRO_DEFAULT_FILES_FOLDER,
         )
+
+    def default_geodatabase(self):
+        return self.pro_defaults / cfg.DEFAULT_GEODATABASE
+
+    def default_toolbox(self):
+        return self.pro_defaults / cfg.DEFAULT_TOOLBOX
 
     def data_scramble_sheet_url(self):
         """Link from the '... Data Scramble Sheet.url' shortcut in the project root, if any."""
@@ -366,6 +378,81 @@ def admin0_dataset(resolved):
     return None
 
 
+# =============================================================================
+# The feather (fade outside the affected country)
+# =============================================================================
+
+def feather_file(admin0, event, paths):
+    """Feather file name, as made by the Data Scramble toolbox (2.1 Create
+    Feather): the admin 0 file's ending after the permission code, e.g.
+    ven_admn_ad0_py_s1_ine_pp_country.shp ->
+    ven_carto_fea_py_mapaction_pp_faded_country.shp."""
+    parts = admin0.stem.split("_")
+    ending = "country"
+    for index in range(4, len(parts) - 1):
+        if parts[index].lower() in PERMISSION_CODES:
+            ending = "_".join(parts[index + 1:])
+            break
+    folder = (paths.active_data / cfg.FEATHER_BACKGROUND).parent
+    return folder / f"{event.iso3}_carto_fea_py_mapaction_pp_faded_{ending}.shp"
+
+
+def make_feather(admin0, event, paths):
+    """Make the feather data: the admin 0 polygon erased from the global
+    background polygon. Returns the file, or None if it can't be made."""
+    background = paths.active_data / cfg.FEATHER_BACKGROUND
+    if admin0 is None:
+        print("  * no admin 0 polygons in these maps, so no feather")
+        return None
+    if not background.is_file():
+        print(f"  * no feather: global background not found ({background})")
+        return None
+
+    target = feather_file(admin0, event, paths)
+    newest_input = max(admin0.stat().st_mtime, background.stat().st_mtime)
+    if not cfg.TEST_MODE and target.is_file() and target.stat().st_mtime >= newest_input:
+        return target
+    try:
+        with arcpy.EnvManager(overwriteOutput=True, outputMFlag="Disabled", outputZFlag="Disabled"):
+            arcpy.analysis.Erase(str(background), str(admin0), str(target))
+    except Exception as error:
+        if target.is_file():
+            print(f"  * could not remake {target.name} (in use?), using the existing file: {error}")
+            return target
+        print(f"  * could not make the feather {target.name}: {error}")
+        return None
+    print(f"  made the feather {target.name} from {admin0.name}")
+    return target
+
+
+def feather_symbol():
+    """Stacked white fills, each pulled further away from the country's
+    border, so the fade builds up gradually (see FEATHER_STEPS)."""
+    fills = []
+    for step in range(cfg.FEATHER_STEPS):
+        offset = arcpy.cim.CreateCIMObjectFromClassName("CIMGeometricEffectOffset", "V3")
+        offset.method = "Rounded"
+        offset.option = "Accurate"
+        offset.offset = -step * cfg.FEATHER_STEP_PT  # negative shrinks the mask, away from the border
+        fill = solid_fill([255, 255, 255, cfg.FEATHER_STEP_OPACITY])
+        fill.effects = [offset]
+        fills.append(fill)
+    return polygon_symbol(fills)
+
+
+def style_feather(layer):
+    """Give the feather layer its symbol. The layer file's own symbol is
+    replaced: the standard one expects older ring-shaped feather data with
+    an 'xpar' transparency field, which the toolbox's feather does not have."""
+    definition = layer.getDefinition("V3")
+    renderer = arcpy.cim.CreateCIMObjectFromClassName("CIMSimpleRenderer", "V3")
+    renderer.symbol = feather_symbol()
+    renderer.label = "Feather"
+    renderer.patch = "Default"
+    definition.renderer = renderer
+    layer.setDefinition(definition)
+
+
 def source_display_names(sources):
     """Marginalia names for data sources ('naturalearth' -> 'Natural Earth')."""
     missing = sorted(s for s in sources if s not in cfg.SOURCE_NAMES)
@@ -536,18 +623,28 @@ def save_with_retry(aprx, attempts=5, delay=1.5):
 # Layout styling
 # =============================================================================
 
-def white_fill():
-    """CIM symbol reference for a plain white fill."""
+def solid_fill(rgba):
+    """CIM solid fill symbol layer; rgba is [red, green, blue, opacity %]."""
     color = arcpy.cim.CreateCIMObjectFromClassName("CIMRGBColor", "V3")
-    color.values = [255, 255, 255, 100]
+    color.values = list(rgba)
     fill = arcpy.cim.CreateCIMObjectFromClassName("CIMSolidFill", "V3")
     fill.enable = True
     fill.color = color
+    return fill
+
+
+def polygon_symbol(symbol_layers):
+    """CIM symbol reference for a polygon symbol made of these layers."""
     polygon = arcpy.cim.CreateCIMObjectFromClassName("CIMPolygonSymbol", "V3")
-    polygon.symbolLayers = [fill]
+    polygon.symbolLayers = symbol_layers
     reference = arcpy.cim.CreateCIMObjectFromClassName("CIMSymbolReference", "V3")
     reference.symbol = polygon
     return reference
+
+
+def white_fill():
+    """CIM symbol reference for a plain white fill."""
+    return polygon_symbol([solid_fill([255, 255, 255, 100])])
 
 
 def all_elements(elements):
@@ -644,7 +741,18 @@ def next_version(paths, map_code):
     return f"v{max(versions, default=0) + 1:02d}"
 
 
-def create_project(template, pagx, target):
+def set_project_defaults(aprx, target, paths):
+    """Home folder, default geodatabase and default toolbox. The template's
+    own point at the project it was made in, so ArcGIS Pro would ask for them
+    each time the new project is opened."""
+    aprx.homeFolder = str(target.parent)
+    for setting, path in (("defaultGeodatabase", paths.default_geodatabase()),
+                          ("defaultToolbox", paths.default_toolbox())):
+        if path.exists():
+            setattr(aprx, setting, str(path))
+
+
+def create_project(template, pagx, target, paths):
     """New project from the template, with the template's maps and layouts
     replaced by the chosen .pagx layout (which brings its own Main map and
     Location map). saveACopy gives the copy new internal IDs, so it stays
@@ -656,6 +764,7 @@ def create_project(template, pagx, target):
     target.chmod(stat.S_IWRITE | stat.S_IREAD)  # templates are often read-only
 
     aprx = arcpy.mp.ArcGISProject(str(target))
+    set_project_defaults(aprx, target, paths)  # first, so nothing is written to the template's old folders
     for layout in aprx.listLayouts():
         aprx.deleteItem(layout)
     for map_obj in aprx.listMaps():
@@ -678,6 +787,11 @@ def add_map_layers(aprx, map_spec, resolved, paths):
             if layer is None:
                 continue
             point_layer_at(layer, resolved[spec])
+            if name == cfg.FEATHER_LAYER:
+                try:
+                    style_feather(layer)
+                except Exception as error:
+                    print(f"  * could not style the feather: {error}")
             sources.add(data_source_of(resolved[spec]))
     return sources
 
@@ -705,6 +819,210 @@ def finish_maps(aprx, map_spec, resolved, event, choices):
                     layer.definitionQuery = f"ISO3CD NOT LIKE '%{event.iso3.upper()}%'"
 
 
+def frame_cameras(layout):
+    """{map name: (x, y, scale, width, height)} of each map frame's view, in
+    the map's coordinates, so the map tabs can open at the same view."""
+    cameras = {}
+    for frame in layout.listElements("MAPFRAME_ELEMENT"):
+        if frame.map is None:
+            continue
+        camera = frame.camera
+        extent = camera.getExtent()
+        cameras[frame.map.name] = (camera.X, camera.Y, camera.scale, extent.width, extent.height)
+    return cameras
+
+
+def pane_layout_xml(tabs, active):
+    """ArcGIS Pro's saved window layout: the Contents pane on the left, the
+    Catalog pane on the right, and the given tabs open in the middle.
+    tabs is a list of (pane name, view id)."""
+    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+    contents, catalog = str(uuid.uuid4()), str(uuid.uuid4())
+    windows = [(str(uuid.uuid4()), name, view_id) for name, view_id in tabs]
+    selected = next(unique for unique, name, _ in windows if name == active)
+    refs = "".join(f'<UIElement xsi:type="DocumentWindowRef" UniqueId="{unique}" />'
+                   for unique, _, _ in windows)
+    documents = "".join(
+        f'<DocumentWindow UniqueId="{unique}" SerializationId="{name}" Name="{name}" '
+        f'ContainerDockedSize="1200,800" IsOpen="true" '
+        f'LastActiveDateTime="{now}.{"9" if name == active else "0"}" State="Document">'
+        f'<Tag xsi:type="xsd:unsignedInt">{view_id}</Tag></DocumentWindow>'
+        for unique, name, view_id in windows)
+    tool_windows = "".join(
+        f'<ToolWindow UniqueId="{unique}" SerializationId="{name}" Name="{name}" '
+        f'ContainerDockedSize="300,800" IsOpen="true" LastActiveDateTime="{now}" State="Docked">'
+        f'<Tag xsi:type="xsd:boolean">true</Tag></ToolWindow>'
+        for unique, name in ((contents, "esri_core_contentsDockPane"),
+                             (catalog, "esri_core_projectDockPane")))
+    dock_site = (
+        '<DockSiteLayout xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+        'xmlns:xsd="http://www.w3.org/2001/XMLSchema" SerializationFormat="All" Version="2">'
+        '<AutoHideHost />'
+        '<Content xsi:type="SplitContainer" Orientation="Horizontal" DockedSize="1800,800">'
+        f'<UIElement xsi:type="ToolWindowContainer" DockedSize="300,800" SelectedWindowUniqueId="{contents}">'
+        f'<UIElement xsi:type="ToolWindowRef" UniqueId="{contents}" /></UIElement>'
+        '<UIElement xsi:type="Workspace"><Content xsi:type="TabbedMdiHost">'
+        f'<Content xsi:type="TabbedMdiContainer" DockedSize="1200,800" SelectedWindowUniqueId="{selected}">'
+        f'{refs}</Content></Content></UIElement>'
+        f'<UIElement xsi:type="ToolWindowContainer" DockedSize="300,800" SelectedWindowUniqueId="{catalog}">'
+        f'<UIElement xsi:type="ToolWindowRef" UniqueId="{catalog}" /></UIElement>'
+        '</Content>'
+        f'<DocumentWindows>{documents}</DocumentWindows>'
+        f'<ToolWindows>{tool_windows}</ToolWindows>'
+        '</DockSiteLayout>')
+    return (f"<esriPaneState>\n  <PaneState>{xml_escape(dock_site)}</PaneState>\n"
+            f"  <ActivePane>{active}</ActivePane>\n</esriPaneState>")
+
+
+def edit_project_json(project_file, edit):
+    """Edit a closed .aprx's GISProject.json (project items, default
+    geodatabase, open views...). An .aprx is a zip file; `edit` is called
+    with the parsed JSON and changes it in place."""
+    with zipfile.ZipFile(project_file) as archive:
+        entries = [(info, archive.read(info)) for info in archive.infolist()]
+    index = next(i for i, (info, _) in enumerate(entries) if info.filename == "GISProject.json")
+    raw = entries[index][1]
+    bom = raw.startswith(b"\xef\xbb\xbf")
+    project = json.loads(raw.decode("utf-8-sig"))
+    result = edit(project)
+    text = json.dumps(project, indent=2, ensure_ascii=False).encode("utf-8")
+    entries[index] = (entries[index][0], (b"\xef\xbb\xbf" if bom else b"") + text)
+
+    temporary = project_file.with_suffix(".aprx.tmp")
+    with zipfile.ZipFile(temporary, "w") as archive:
+        for info, data in entries:
+            archive.writestr(info, data, compress_type=info.compress_type)
+    temporary.replace(project_file)
+    return result
+
+
+# Project items that only record past work (tool history, notebooks), and
+# items that point at files or folders.
+HISTORY_ITEM_TYPES = {"GPHistory", "RFxHistory", "Notebook"}
+FILE_ITEM_TYPES = {"FolderConnection", "GDB", "GP", "Style"}
+GIS_FOLDER_IN_PATH = re.compile(r"(?:^|[\\/])GIS(?:[\\/]|$)", re.IGNORECASE)
+
+
+def item_target(path_text, folder, gis_folder):
+    """Where a project item's path should point, or None if nothing is there.
+    A path into a GIS folder (e.g. of the project a template was made in) is
+    moved to the same place in this project's GIS folder when that exists,
+    even if the old place exists too."""
+    match = GIS_FOLDER_IN_PATH.search(path_text)
+    if match:
+        moved = Path(os.path.normpath(gis_folder / path_text[match.end():]))
+        if moved.exists():
+            return moved
+    path = Path(path_text)
+    path = Path(os.path.normpath(path if path.is_absolute() else folder / path))
+    return path if path.exists() else None
+
+
+def relative_to(path, folder):
+    try:
+        return os.path.relpath(path, folder)
+    except ValueError:  # different drive
+        return str(path)
+
+
+def clean_project_items(project, folder, gis_folder):
+    """Remove clutter a project inherits from its template: tool and notebook
+    history, connections to files that don't exist, and duplicates. Paths
+    into another project's GIS folder are moved to this one where the file
+    exists. `folder` holds the .aprx. Returns the number of items removed."""
+    kept, seen = [], set()
+    items = project.get("projectItems", [])
+    for item in items:
+        kind = item.get("itemType")
+        if kind in HISTORY_ITEM_TYPES:
+            continue
+        path_text = item.get("catalogPath") or ""
+        is_file = kind in FILE_ITEM_TYPES and (
+            "\\" in path_text or "/" in path_text or path_text.lower().endswith(".stylx"))
+        if is_file:  # built-in styles ("ArcGIS 2D") are names, not files
+            target = item_target(path_text, folder, gis_folder)
+            key = (kind, os.path.normcase(str(target)))
+            if target is None or key in seen:
+                continue
+            seen.add(key)
+            item["catalogPath"] = relative_to(target, folder)
+            item["pathHint"] = str(target)
+            if any(separator in item.get("name", "") for separator in "\\/"):
+                item["name"] = target.name
+        kept.append(item)
+    project["projectItems"] = kept
+    return len(items) - len(kept)
+
+
+def set_default_items(project, folder, paths):
+    """Point the project's default geodatabase, toolbox and home folder at
+    this CMF (in the JSON; for a closed project such as the template), and
+    make sure both appear in the Catalog pane."""
+    project["defaultGeoDatabase"] = relative_to(paths.default_geodatabase(), folder)
+    project["defaultToolbox"] = relative_to(paths.default_toolbox(), folder)
+    project["defaultFolder"] = "."
+    present = {(item.get("itemType"), os.path.normcase(item.get("pathHint", "")))
+               for item in project.get("projectItems", [])}
+    for kind, target in (("GDB", paths.default_geodatabase()), ("GP", paths.default_toolbox())):
+        if target.exists() and (kind, os.path.normcase(str(target))) not in present:
+            project["projectItems"].append({
+                "type": "CIMProjectItem", "iD": str(uuid.uuid4()),
+                "catalogPath": relative_to(target, folder), "pathHint": str(target),
+                "itemType": kind, "name": target.stem, "pathSaveRelative": True,
+            })
+
+
+def finish_project_file(project_file, cameras, layout_name, page, paths):
+    """Final edits to the saved, closed project: remove the template's clutter
+    (see clean_project_items) and set the tabs ArcGIS Pro opens. arcpy can't
+    do either outside a running ArcGIS Pro, so GISProject.json is edited
+    directly."""
+    def edit(project):
+        removed = clean_project_items(project, project_file.parent, paths.root / "GIS")
+        open_views_on_start(project, cameras, layout_name, page)
+        return removed
+    return edit_project_json(project_file, edit)
+
+
+def open_views_on_start(project, cameras, layout_name, page):
+    """Open the Main map, Location map and layout as tabs when the project
+    is opened, the maps at their map frames' views, with the layout in front.
+    The open views and window layout are in GISProject.json."""
+    paths_by_name = {(item.get("itemType"), item.get("name")): item.get("catalogPath")
+                     for item in project.get("projectItems", [])}
+    views, tabs = [], []
+    for view_id, map_name in enumerate((MAIN, LOCATION), 1):
+        path = paths_by_name.get(("Map", map_name))
+        if not path or map_name not in cameras:
+            continue
+        x, y, scale, width, height = cameras[map_name]
+        views.append({
+            "type": "CIMMapView", "viewableObjectPath": path, "viewType": "esri_mapping_mapPane",
+            "instanceID": view_id, "viewingMode": "Map",
+            "camera": {"type": "CIMViewCamera", "pitch": -90, "scale": scale, "x": x, "y": y,
+                       "z": "NaN", "viewportWidth": width, "viewportHeight": height},
+        })
+        tabs.append((f"esri_mapping_mapPane_{view_id}", view_id))
+    layout_path = paths_by_name.get(("Layout", layout_name))
+    if layout_path:
+        view_id = len(views) + 1
+        width, height = page
+        margin = max(width, height) * 0.05
+        views.append({
+            "type": "CIMLayoutView", "viewableObjectPath": layout_path,
+            "viewType": "esri_layouts_layoutPane", "instanceID": view_id,
+            "extent": {"xmin": -margin, "ymin": -margin, "xmax": width + margin, "ymax": height + margin},
+            "defaultMapFrameName": MAIN,
+        })
+        tabs.append((f"esri_layouts_layoutPane_{view_id}", view_id))
+    if not tabs:
+        print("  * could not set the tabs to open: maps and layout not found in the project")
+        return
+
+    project["views"] = views
+    project["viewLayoutXML"] = pane_layout_xml(tabs, active=tabs[-1][0])
+
+
 def zoom_frames(aprx, layout):
     """Zoom each map frame to its extent layer (see FRAME_EXTENTS)."""
     for frame_name, (layer_name, multiplier) in cfg.FRAME_EXTENTS.items():
@@ -730,7 +1048,7 @@ def build_map(map_spec, resolved, event, choices, paths):
     jpeg_file = paths.map_exports / map_spec.code / version / f"{base_name}.jpg"
     jpeg_file.parent.mkdir(parents=True, exist_ok=True)
 
-    create_project(choices.template, choices.layout, project_file)
+    create_project(choices.template, choices.layout, project_file, paths)
 
     # 1. Add the layers, save, and close the project.
     aprx = arcpy.mp.ArcGISProject(str(project_file))
@@ -749,8 +1067,17 @@ def build_map(map_spec, resolved, event, choices, paths):
     update_text(layout, map_spec, version, event, choices.country, sources, choices.main_projection)
     save_with_retry(aprx)
     layout.exportToJPEG(str(jpeg_file), resolution=event.jpeg_dpi)
+    cameras = frame_cameras(layout)
+    layout_name, page = layout.name, (layout.pageWidth, layout.pageHeight)
     del layout, aprx
     gc.collect()
+
+    # 3. Remove the template's clutter; open the maps and layout as tabs.
+    try:
+        removed = finish_project_file(project_file, cameras, layout_name, page, paths)
+        print(f"  removed {removed} leftover project items inherited from the template")
+    except Exception as error:
+        print(f"  * could not tidy the project or set its tabs: {error}")
 
     print(f"  project: {project_file.relative_to(paths.root)}")
     print(f"  jpeg:    {jpeg_file.relative_to(paths.root)}")
@@ -794,7 +1121,12 @@ def main():
 
     # Data first: choosing datasets may need questions too.
     print("\nFinding data")
-    resolved = resolve_datasets(specs, event, paths)
+    feather_specs = [s for s in specs if s.layer == cfg.FEATHER_LAYER]
+    resolved = resolve_datasets([s for s in specs if s not in feather_specs], event, paths)
+    if feather_specs:
+        feather = make_feather(admin0_dataset(resolved), event, paths)
+        if feather:
+            resolved.update({spec: feather for spec in feather_specs})
     for spec, dataset in resolved.items():
         print(f"  {spec.frame:12} {spec.layer:32} -> {dataset.name}")
 
@@ -814,6 +1146,8 @@ def main():
     print(f"Country:      {choices.country}")
 
     warnings = check_layer_files(specs, paths) + check_label_fields(resolved, event)
+    warnings += [f"{path} not found, so ArcGIS Pro will ask for it when a new project is opened"
+                 for path in (paths.default_geodatabase(), paths.default_toolbox()) if not path.exists()]
     warnings += [f"no data found for '{s.layer}' ({s.frame}): {s.prefix} {s.pattern} in {s.folder}"
                  for s in specs if s not in resolved]
     if warnings:
