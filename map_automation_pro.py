@@ -21,6 +21,7 @@ Only the standard library and arcpy are used.
 import argparse
 import gc
 import json
+import math
 import os
 import re
 import shutil
@@ -298,6 +299,32 @@ def choose_layout(paths, hint):
     return layouts[choose_number(f"Choose 1-{len(layouts)}: ", 1, len(layouts), "LAYOUT") - 1]
 
 
+ADMIN_NAME_FIELD = re.compile(r"^ADM([12])_([A-Z]{2})$")
+
+
+def choose_admin_language(resolved, default="EN"):
+    """Language part of the admin 1 and 2 name fields used in labels (EN for
+    ADM1_EN, ES for ADM1_ES...). Lists the fields found in the data."""
+    if cfg.ADMIN_LABEL_LANGUAGE:
+        return cfg.ADMIN_LABEL_LANGUAGE.strip().upper()
+
+    found = set()
+    for spec, dataset in resolved.items():
+        if re.match(r"admn_ad[12]_py", spec.layer) and dataset.suffix.lower() == ".shp":
+            for field in arcpy.ListFields(str(dataset)):
+                if ADMIN_NAME_FIELD.match(field.name.upper()):
+                    found.add(field.name.upper())
+
+    print("\nAdmin 1 and 2 label language: the xx in the ADM1_xx / ADM2_xx name fields.")
+    print(f"  Name fields in the data: {', '.join(sorted(found)) or 'none found'}")
+    while True:
+        answer = ask(f"Language code [{default}]: ", "ADMIN_LABEL_LANGUAGE").upper()
+        answer = re.sub(r"^ADM[12]_", "", answer) or default
+        if re.fullmatch(r"[A-Z]{2}", answer):
+            return answer
+        print("  Please enter a two-letter code such as EN or ES (or ADM1_ES).")
+
+
 # =============================================================================
 # Finding the data for each layer
 # =============================================================================
@@ -497,17 +524,19 @@ def check_layer_files(specs, paths):
     return [f"layer file missing: {paths.layer_files / (name + cfg.LAYER_FILE_EXT)}" for name in missing]
 
 
-def check_label_fields(resolved, event):
-    """Admin 0/1 polygons must have a label field in the event's language
-    (ADM0_EN, ADM1_EN...). Boundary lines are not labelled, so are skipped."""
+def check_label_fields(resolved, event, admin_language):
+    """Admin polygons must have a name field in the label language: ADM0_xx
+    in the event's, ADM1_xx / ADM2_xx in the chosen admin label language.
+    Boundary lines are not labelled, so are skipped."""
     warnings = []
     checked = set()
     for spec, dataset in resolved.items():
-        match = re.search(r"admn_ad([01])_py_", spec.layer)
+        match = re.search(r"admn_ad([012])_py_", spec.layer)
         if not match or dataset.suffix.lower() != ".shp" or dataset in checked:
             continue
         checked.add(dataset)
-        field = f"ADM{match.group(1)}_{event.language}"
+        level = match.group(1)
+        field = f"ADM{level}_{event.language if level == '0' else admin_language}"
         fields = [f.name.upper() for f in arcpy.ListFields(str(dataset))]
         if field not in fields:
             warnings.append(f"{dataset.name}: no '{field}' field, so labels using admin names keep "
@@ -548,7 +577,11 @@ def clear_outputs(paths):
         for base in (paths.map_projects, paths.map_exports):
             folder = base / map_spec.code
             if folder.exists():
-                shutil.rmtree(folder)
+                try:
+                    shutil.rmtree(folder)
+                except PermissionError as error:
+                    raise SystemExit(f"\nCannot delete {error.filename}: it is open in another "
+                                     "program (usually ArcGIS Pro). Close it and run again.")
                 print(f"  deleted {folder.relative_to(paths.root)}")
 
 
@@ -585,18 +618,20 @@ def point_layer_at(layer, dataset):
         print(f"  * could not link {layer.name} to {dataset.name}: {error}")
 
 
-def set_label_language(layer, language):
-    """Rewrite ADM0_xx / ADM1_xx field names in a layer's label expressions to
-    the event language. Works for VBScript ([ADM1_EN]), Python (!ADM1_EN!) and
-    Arcade ($feature.ADM1_EN) expressions. A field is only switched if the
-    data has it (e.g. Venezuela's admin 1 names exist only as ADM1_ES)."""
+def set_label_language(layer, language, admin_language):
+    """Rewrite ADMn_xx field names in a layer's label expressions: ADM0_xx to
+    the event language, ADM1_xx and ADM2_xx to the chosen admin label
+    language. Works for VBScript ([ADM1_EN]), Python (!ADM1_EN!) and Arcade
+    ($feature.ADM1_EN) expressions. A field is only switched if the data has
+    it."""
     if not (layer.supports("ISFEATURELAYER") and layer.isFeatureLayer):
         return
     fields = {f.name.upper() for f in arcpy.ListFields(layer)}
-    pattern = re.compile(r"\bADM([01])_[A-Za-z]{2}\b", re.IGNORECASE)
+    pattern = re.compile(r"\bADM([012])_[A-Za-z]{2}\b", re.IGNORECASE)
 
     def switch(match):
-        wanted = f"ADM{match.group(1)}_{language}"
+        level = match.group(1)
+        wanted = f"ADM{level}_{language if level == '0' else admin_language}"
         return wanted if wanted in fields else match.group(0)
 
     for label_class in layer.listLabelClasses():
@@ -642,9 +677,9 @@ def polygon_symbol(symbol_layers):
     return reference
 
 
-def white_fill():
-    """CIM symbol reference for a plain white fill."""
-    return polygon_symbol([solid_fill([255, 255, 255, 100])])
+def white_fill(opacity=100):
+    """CIM symbol reference for a plain white fill (opacity in percent)."""
+    return polygon_symbol([solid_fill([255, 255, 255, opacity])])
 
 
 def all_elements(elements):
@@ -669,23 +704,57 @@ def fill_legend(layout, main_map):
     for layer in main_map.listLayers():
         if layer.name not in cfg.LEGEND_EXCLUDE and not layer.isGroupLayer:
             legend.addItem(layer, "BOTTOM")
+            if layer.name in cfg.LEGEND_HEADINGS:
+                set_legend_heading(layer, cfg.LEGEND_HEADINGS[layer.name])
+
+
+def set_legend_heading(layer, text):
+    """Set the heading a layer shows in legends: the raster colorizer's
+    heading, or the feature renderer's. style_layout makes it visible."""
+    cim = layer.getDefinition("V3")
+    target = getattr(cim, "colorizer", None) or getattr(cim, "renderer", None)
+    if target is None or not hasattr(target, "heading"):
+        print(f"  * cannot set the legend heading of {layer.name}")
+        return
+    target.heading = text
+    layer.setDefinition(cim)
 
 
 def style_layout(layout):
-    """White backgrounds for the legend and every text box; legend entries
-    show the symbol labels only (layer names are config codes), and the
-    legend frame shrinks or grows to fit them."""
+    """White backgrounds for the legend and every text box, except text in
+    GROUP_BACKGROUNDS groups, which share one background for the group.
+    Legend entries show the symbol labels only (layer names are config
+    codes), the legend has LEGEND_COLUMNS_LANDSCAPE or _PORTRAIT columns,
+    and its frame shrinks or grows to fit them."""
     definition = layout.getDefinition("V3")
+    in_group = set()  # ids of elements inside a GROUP_BACKGROUNDS group
+    # all_elements yields each group before its members.
     for element in all_elements(definition.elements):
         kind = type(element).__name__
+        if kind == "CIMGroupElement" and element.name in cfg.GROUP_BACKGROUNDS:
+            in_group.update(id(member) for member in all_elements(element.elements))
+            if element.graphicFrame is None:
+                element.graphicFrame = arcpy.cim.CreateCIMObjectFromClassName("CIMGraphicFrame", "V3")
+            frame = element.graphicFrame
+            frame.backgroundSymbol = white_fill(cfg.GROUP_BACKGROUNDS[element.name])
+            frame.backgroundGapX = frame.backgroundGapY = 2
+            continue
+        is_text = (kind == "CIMGraphicElement"
+                   and type(element.graphic).__name__ == "CIMParagraphTextGraphic")
+        if is_text and id(element) in in_group:
+            if element.graphic.frame is not None:
+                element.graphic.frame.backgroundSymbol = None
+            continue
         if kind == "CIMLegend":
             frame = element.graphicFrame
             element.fittingStrategy = "AdjustFrame"
+            landscape = layout.pageWidth > layout.pageHeight
+            element.columns = cfg.LEGEND_COLUMNS_LANDSCAPE if landscape else cfg.LEGEND_COLUMNS_PORTRAIT
             for item in element.items:
                 item.showLayerName = False
-                item.showHeading = False
+                item.showHeading = item.name in cfg.LEGEND_HEADINGS
             gap = 2
-        elif kind == "CIMGraphicElement" and type(element.graphic).__name__ == "CIMParagraphTextGraphic":
+        elif is_text:
             if element.graphic.frame is None:
                 element.graphic.frame = arcpy.cim.CreateCIMObjectFromClassName("CIMGraphicFrame", "V3")
             frame = element.graphic.frame
@@ -730,6 +799,7 @@ class RunChoices:
     main_projection: object  # arcpy.SpatialReference
     location_projection: object
     country: str
+    admin_language: str      # upper case, for ADM1_xx / ADM2_xx label fields
 
 
 def next_version(paths, map_code):
@@ -811,12 +881,17 @@ def finish_maps(aprx, map_spec, resolved, event, choices):
         for map_obj in aprx.listMaps(spec.frame):
             for layer in map_obj.listLayers(spec.layer):
                 try:
-                    set_label_language(layer, event.language)
+                    set_label_language(layer, event.language, choices.admin_language)
                 except Exception as error:
                     print(f"  * could not set label language on {layer.name}: {error}")
-                if spec.exclude_affected_country and layer.supports("DEFINITIONQUERY"):
-                    # ISO3CD holds a country code (VEN) or, for boundary lines, a pair (COL_VEN).
-                    layer.definitionQuery = f"ISO3CD NOT LIKE '%{event.iso3.upper()}%'"
+                if layer.supports("DEFINITIONQUERY"):
+                    if spec.exclude_affected_country:
+                        # ISO3CD holds a country code (VEN) or, for boundary lines, a pair (COL_VEN).
+                        layer.definitionQuery = f"ISO3CD NOT LIKE '%{event.iso3.upper()}%'"
+                    elif spec.only_affected_country:
+                        layer.definitionQuery = f"{spec.only_affected_country} = '{event.iso3.lower()}'"
+                if not spec.labels and layer.supports("SHOWLABELS"):
+                    layer.showLabels = False
 
 
 def frame_cameras(layout):
@@ -1023,8 +1098,23 @@ def open_views_on_start(project, cameras, layout_name, page):
     project["viewLayoutXML"] = pane_layout_xml(tabs, active=tabs[-1][0])
 
 
+def round_scale_up(scale, fraction=None):
+    """Round a scale up to a tidy figure. The step is the value in the series
+    1, 2, 5, 10, 20, 50, ... closest (by ratio) to scale * fraction
+    (default SCALE_ROUNDING_FRACTION). Returns (rounded scale, step)."""
+    if fraction is None:
+        fraction = cfg.SCALE_ROUNDING_FRACTION
+    target = max(scale * fraction, 1)
+    exponent = math.floor(math.log10(target))
+    steps = [m * 10 ** e for e in (exponent - 1, exponent, exponent + 1) for m in (1, 2, 5)
+             if m * 10 ** e >= 1]
+    step = min(steps, key=lambda s: abs(math.log(s / target)))
+    return math.ceil(scale / step) * step, step
+
+
 def zoom_frames(aprx, layout):
-    """Zoom each map frame to its extent layer (see FRAME_EXTENTS)."""
+    """Zoom each map frame to its extent layer (see FRAME_EXTENTS), then
+    multiply its scale and round it up (see round_scale_up)."""
     for frame_name, (layer_name, multiplier) in cfg.FRAME_EXTENTS.items():
         frames = layout.listElements("MAPFRAME_ELEMENT", frame_name)
         maps = aprx.listMaps(frame_name)
@@ -1035,9 +1125,59 @@ def zoom_frames(aprx, layout):
         frame = frames[0]
         try:
             frame.camera.setExtent(frame.getLayerExtent(layers[0], False))
-            frame.camera.scale = round(frame.camera.scale, -3) * multiplier
+            fitted = frame.camera.scale
+            rounded, step = round_scale_up(fitted * multiplier)
+            frame.camera.scale = rounded
+            times = f" x {multiplier} = 1:{fitted * multiplier:,.0f}" if multiplier != 1 else ""
+            print(f"  {frame_name} scale: fitted 1:{fitted:,.0f}{times}, "
+                  f"rounded up (step {step:,}) to 1:{rounded:,}")
         except Exception as error:
             print(f"  * could not zoom '{frame_name}' to {layer_name}: {error}")
+
+
+MM_PER_PAGE_UNIT = {"MILLIMETER": 1, "CENTIMETER": 10, "INCH": 25.4, "POINT": 25.4 / 72}
+
+
+def nice_up(value):
+    """The smallest number of the form d x 10^n (d = 1..9) that is >= value."""
+    power = 10 ** math.floor(math.log10(value))
+    digit = math.ceil(round(value / power, 9))
+    return digit * power if digit < 10 else 10 * power
+
+
+def fit_scale_bar(layout):
+    """Set the Main map's scale bar to one division of a nice number of km,
+    at least SCALE_BAR_MIN_WIDTH of the page wide, keeping its alignment."""
+    bars = layout.listElements("MAPSURROUND_ELEMENT", cfg.SCALE_BAR_NAME)
+    frames = layout.listElements("MAPFRAME_ELEMENT", MAIN)
+    if not bars or not frames:
+        print(f"  * cannot fit the scale bar: '{cfg.SCALE_BAR_NAME}' or '{MAIN}' frame not found")
+        return
+    bar = bars[0]
+    try:
+        page_mm = layout.pageWidth * MM_PER_PAGE_UNIT[layout.pageUnits]
+        scale = frames[0].camera.scale
+        min_km = page_mm * cfg.SCALE_BAR_MIN_WIDTH * scale / 1e6
+        km = nice_up(min_km)
+        # The bar's position is that of its anchor (left, right or centre, as
+        # set in the layout); put it back after resizing to keep that alignment.
+        anchor_x, anchor_y = bar.elementPositionX, bar.elementPositionY
+        cim = bar.getDefinition("V3")
+        cim.units = {"uwkid": 9036}  # kilometres
+        cim.division, cim.divisions, cim.subdivisions = km, 1, 0
+        cim.divisionsBeforeZero = 0
+        cim.fittingStrategy = "AdjustFrame"  # the frame follows the bar's length
+        cim.unitLabel = cfg.SCALE_BAR_UNIT_LABEL
+        for text in (cim.labelSymbol, cim.unitLabelSymbol):
+            if text is not None and text.symbol is not None:
+                text.symbol.height *= cfg.SCALE_BAR_TEXT_SIZE_FACTOR
+        bar.setDefinition(cim)
+        bar.elementPositionX, bar.elementPositionY = anchor_x, anchor_y
+        width_mm = km * 1e6 / scale
+        print(f"  scale bar: {km:g} km, {width_mm:.1f} mm wide "
+              f"(at least {min_km:.1f} km = {cfg.SCALE_BAR_MIN_WIDTH:.0%} of the page width)")
+    except Exception as error:
+        print(f"  * could not fit the scale bar: {error}")
 
 
 def build_map(map_spec, resolved, event, choices, paths):
@@ -1062,6 +1202,7 @@ def build_map(map_spec, resolved, event, choices, paths):
     finish_maps(aprx, map_spec, resolved, event, choices)
     layout = aprx.listLayouts()[0]
     zoom_frames(aprx, layout)
+    fit_scale_bar(layout)
     fill_legend(layout, aprx.listMaps(MAIN)[0])
     style_layout(layout)
     update_text(layout, map_spec, version, event, choices.country, sources, choices.main_projection)
@@ -1138,14 +1279,17 @@ def main():
     admin0 = admin0_dataset(resolved)
     hint = country_shape_hint(admin0, main_projection) if admin0 else ""
     layout = choose_layout(paths, hint)
-    choices = RunChoices(template, layout, main_projection, location_projection, country_name(admin0, event))
+    admin_language = choose_admin_language(resolved)
+    choices = RunChoices(template, layout, main_projection, location_projection,
+                         country_name(admin0, event), admin_language)
 
     print(f"\nMain map:     {pretty_name(main_projection)}")
     print(f"Location map: {pretty_name(location_projection)}")
     print(f"Layout:       {layout.stem}")
     print(f"Country:      {choices.country}")
+    print(f"Admin labels: ADM1_{admin_language} / ADM2_{admin_language}")
 
-    warnings = check_layer_files(specs, paths) + check_label_fields(resolved, event)
+    warnings = check_layer_files(specs, paths) + check_label_fields(resolved, event, admin_language)
     warnings += [f"{path} not found, so ArcGIS Pro will ask for it when a new project is opened"
                  for path in (paths.default_geodatabase(), paths.default_toolbox()) if not path.exists()]
     warnings += [f"no data found for '{s.layer}' ({s.frame}): {s.prefix} {s.pattern} in {s.folder}"

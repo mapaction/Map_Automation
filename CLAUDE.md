@@ -63,12 +63,13 @@ manifest.
 
 ## Running and testing
 
-The script asks three questions on stdin. For the standard test, pipe in the
-answers (UTM 19N, location map = same, layout 3 = `landscape_a3_marginalia_inside`):
+The script asks its questions on stdin (projections, layout, admin label language). For the standard test, pipe in the
+answers (UTM 19N, location map = same, layout 3 = `landscape_a3_marginalia_inside`,
+admin labels from `ADM1_ES` / `ADM2_ES`):
 
 ```
 Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
-"2", "19N", "0", "3" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
+"2", "19N", "0", "3", "ES" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
 ```
 
 - PowerShell piping adds a BOM; `ask()` strips it. Piping from Git Bash into
@@ -98,9 +99,10 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
   upper-cased for `ADM0_EN`-style fields. The country name comes from the
   admin 0 data's `ADM0_<LANG>` field unless `COUNTRY_NAME` is set.
 - **Order of a run:** check the config; resolve the datasets (which may ask
-  questions) and make the feather; ask the projections and the layout (the layout question shows
-  the country's width/height ratio in the Main map projection); clear the old
-  outputs in test mode; then build each map.
+  questions) and make the feather; ask the projections, the layout (the
+  question shows the country's width/height ratio in the Main map projection)
+  and the admin label language; clear the old outputs in test mode (stops
+  with a message if a file is open in Pro); then build each map.
 - **Building a map:**
   1. `saveACopy` the template, then at once set its home folder (the
      project's own folder) and its default geodatabase and toolbox (the
@@ -114,10 +116,24 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
      brings its own "Main map" and "Location map".
   3. Add the layers and link them to the data. Save and reopen (label classes
      only see the new data's fields after a reopen).
-  4. Set the projections, label language and country definition queries.
-  5. Zoom the frames, then fill the legend.
+  4. Set the projections, label language (`ADM0_xx` from the event
+     language, `ADM1_xx`/`ADM2_xx` from the admin label question; a field is
+     only switched if the data has it), definition queries
+     (`exclude_affected_country` on `ISO3CD`, `only_affected_country` on a
+     lower-case ISO3 field) and `labels=False`.
+  5. `zoom_frames`: fit each frame to its `FRAME_EXTENTS` layer, multiply,
+     then `round_scale_up` (step about scale x `SCALE_ROUNDING_FRACTION`,
+     from the 1-2-5 series; always rounds up). `fit_scale_bar`: one division
+     of the smallest d x 10^n km at least `SCALE_BAR_MIN_WIDTH` of the page
+     wide, `AdjustFrame`, anchor position restored (keeps the layout's
+     alignment), text x `SCALE_BAR_TEXT_SIZE_FACTOR`. Then fill the legend,
+     setting `LEGEND_HEADINGS` on the layers (raster colorizer or renderer
+     heading).
   6. CIM styling: white backgrounds on the legend and on every
-     `CIMParagraphTextGraphic`; legend items hide layer names and headings.
+     `CIMParagraphTextGraphic`, except text in `GROUP_BACKGROUNDS` groups,
+     which share one background on the group's own frame (75% opaque);
+     legend columns from the page shape; legend items hide layer names, and
+     headings unless in `LEGEND_HEADINGS`.
   7. Fill in the text elements, then export.
   8. After the project is closed, `finish_project_file` edits its
      `GISProject.json` (the `.aprx` is a zip): `clean_project_items` drops
@@ -134,6 +150,9 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
 - **Layer names** are set to the config keys (e.g. `admn_ad1_ln_all_reference`)
   so they can be found again. That's why the legend hides layer names and
   shows only the symbol labels.
+- **Drawing order** is each `MapSpec.layers` list, top first (layers are
+  added at the bottom in turn). The feather is first, so it fades
+  everything outside the country; labels always draw above it.
 - **Data matching:** `<prefix><pattern>` is globbed in `2_Active_Data/<folder>`.
   If several files match, `PREFERRED_DATASETS` is checked first, then
   `PREFERRED_SUPPLIER`, then the user is asked.
@@ -162,6 +181,14 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
 - The standard CMF's template has the same clutter as the test copy's had.
   The script copes, but `tools/clean_template.py` could be run on it at
   release time (with the user's say-so).
-- Venezuela's admin 1 and 2 data has no `_EN` name fields.
+- Venezuela's admin 1 and 2 data has no `_EN` name fields; the test answers
+  `ES` to the admin label question. The test copy's
+  `admn_ad1_py_all_reference.lyrx` had to be put back to the standard label
+  (the live one labels P-codes only); it is a `LOCAL_CHANGES` file.
+- Since the scale bar, legend columns and group background were added, only
+  `landscape_a3_marginalia_inside` has been run. Portrait layouts (two-column
+  legend) and right/centre-anchored scale bars are untested.
+- Small admin 1 polygons are labelled as a numbered list placed by Pro
+  (from the `.lyrx` label settings); on MA901 it sits partly over Colombia.
 - The `.pagx` files (June) may differ from the same-named layouts inside the
   template `.aprx` (October). The script uses the `.pagx`.

@@ -35,6 +35,11 @@ LOCATION_MAP_PROJECTION = None
 # extension, e.g. "landscape_a3_marginalia_inside".
 LAYOUT = None
 
+# Language part of the admin 1 and 2 name fields used in labels: "EN" uses
+# ADM1_EN / ADM2_EN, "ES" uses ADM1_ES / ADM2_ES, and so on. The question
+# lists the ADMx_xx fields found in the data; its default is EN.
+ADMIN_LABEL_LANGUAGE = None
+
 
 # --- Template ---------------------------------------------------------------
 
@@ -110,6 +115,9 @@ class LayerSpec(NamedTuple):
     prefix  -- "country" (affected country ISO3), "world" (WORLD_PREFIX) or "region" ("reg")
     exclude_affected_country -- hide the affected country's own features (for
                neighbouring-country layers; the country has its own layers)
+    only_affected_country -- name of a field holding the lower-case ISO3 code
+               (e.g. "iso3_lower"): show only the affected country's features
+    labels  -- False turns the layer's labels off
     """
     layer: str
     pattern: str
@@ -117,6 +125,8 @@ class LayerSpec(NamedTuple):
     frame: str
     prefix: str = "country"
     exclude_affected_country: bool = False
+    only_affected_country: str = ""
+    labels: bool = True
 
 
 MAIN = "Main map"
@@ -127,7 +137,8 @@ LAYERS = [
     LayerSpec("admn_ad0_py_all_thematic", "_admn_ad0_py_*_ine_pp*.shp", "202_admn", MAIN),
     LayerSpec("stle_stl_pt_natearth_cap-city", "_stle_stl_pt_*_nat*earth_pp*.shp", "229_stle", MAIN),
     LayerSpec("tran_air_pt_ourairports_lge-med", "_tran_air_pt_*_pp*.shp", "232_tran", MAIN),
-    LayerSpec("tran_por_pt_worldports", "_tran_por_pt_*_pp*.shp", "232_tran", MAIN),
+    LayerSpec("tran_por_pt_worldports", "_tran_por_pt_*_pp*.shp", "232_tran", MAIN,
+              only_affected_country="iso3_lower", labels=False),
     LayerSpec("elev_cst_ln_all", "_elev_cst_ln_*_pp*.shp", "211_elev", MAIN),
     LayerSpec("admn_ad0_ln_all_reference", "_admn_ad0_ln_*_ine_pp*.shp", "202_admn", MAIN),
     LayerSpec("tran_rds_ln_natearth", "_tran_rds_ln_*_nat*earth_pp*.shp", "232_tran", MAIN),
@@ -146,7 +157,10 @@ LAYERS = [
     # The feather's data is made by the script (see FEATHER_LAYER below), so
     # its pattern and folder are not used to find data.
     LayerSpec("carto_fea_py_all", "_carto_fea_py_*_pp*.shp", "207_carto", MAIN),
-    LayerSpec("admn_adx_py_all_reference", "_admn_adx_py_*_pp*.shp", "202_admn", MAIN, prefix="world"),
+    # Without the affected country: the layers above style it, and its name
+    # is in the map title.
+    LayerSpec("admn_adx_py_all_reference", "_admn_adx_py_*_pp*.shp", "202_admn", MAIN,
+              prefix="world", exclude_affected_country=True),
 
     # Location map
     # LayerSpec("carto_fea_py_all", "_carto_fea_py_*_pp*.shp", "207_carto", LOCATION),  # disabled for now
@@ -159,12 +173,29 @@ LAYERS = [
 ]
 
 # Each map frame is zoomed to the full extent of this layer, then its scale is
-# rounded to the nearest 1,000 and multiplied (the Location map shows a wider
-# area than the country itself).
+# multiplied (the Location map shows a wider area than the country itself) and
+# rounded UP, so the layer is never clipped.
 FRAME_EXTENTS = {
     MAIN: ("admn_ad0_py_all_thematic", 1),
     LOCATION: ("admn_ad0_py_all_location", 2),
 }
+
+# The rounding step is about this fraction of the scale, picked from the
+# series 1, 2, 5, 10, 20, 50, ... So steps grow with the scale: e.g.
+# 1:100,000 to 1:1,000,000 rounds to 5,000, 10,000, 20,000 or 50,000. At 1/20
+# a map is zoomed out by under 8%.
+SCALE_ROUNDING_FRACTION = 1 / 20
+
+# The Main map's scale bar (layout element of this name) shows one division of
+# the smallest "nice" number of km (1-9, 10-90, 100-900, ... x 10^n) that
+# makes it at least this fraction of the page width. It keeps the layout's
+# alignment (the anchor point set in the layout stays put).
+SCALE_BAR_NAME = "scale_bar"
+SCALE_BAR_MIN_WIDTH = 0.05
+# Its number and unit label are this many times the layout's text size, and
+# the unit label reads SCALE_BAR_UNIT_LABEL.
+SCALE_BAR_TEXT_SIZE_FACTOR = 2
+SCALE_BAR_UNIT_LABEL = "km"
 
 # --- Feather (fades everything outside the affected country) -----------------
 # The feather layer's data is made fresh by the script, in the same way as
@@ -191,7 +222,6 @@ FEATHER_STEP_OPACITY = 15
 # layers whose symbol has no label (or repeats another layer's label).
 LEGEND_EXCLUDE = [
     "carto_fea_py_all",
-    "elev_dem_ras_all",
     "elev_hsh_ras_all",
     "admn_ad0_py_all_thematic",
     "admn_ad1_py_all_reference",
@@ -199,6 +229,24 @@ LEGEND_EXCLUDE = [
     "admn_adx_py_all_reference",
     "admn_adx_ln_all_reference",
 ]
+
+# Legend headings: the legend hides layer names and headings, except for
+# these layers, which show this heading above their symbols.
+LEGEND_HEADINGS = {
+    "elev_dem_ras_all": "Elevation (m)",
+}
+
+# Legend columns, by the shape of the layout's page.
+LEGEND_COLUMNS_LANDSCAPE = 1
+LEGEND_COLUMNS_PORTRAIT = 2
+
+# Text boxes get their own white background, except inside these layout
+# groups: each gets one white background for the whole group instead, at this
+# opacity (percent; 75 = 25% transparent). Groups not in the chosen layout
+# are ignored.
+GROUP_BACKGROUNDS = {
+    "Marginalia: data source elements": 75,  # bottom right: map number ... GLIDE number
+}
 
 
 # --- Maps ---------------------------------------------------------------------
@@ -234,6 +282,7 @@ MAPS = [
         title="Country Overview with Admin 1 Boundaries and Topography",
         summary="Country overview with topography displayed",
         layers=[
+            "carto_fea_py_all",  # on top, so it fades everything outside the country
             "stle_stl_pt_natearth_cap-city",
             "tran_air_pt_ourairports_lge-med",
             "tran_por_pt_worldports",
@@ -243,7 +292,6 @@ MAPS = [
             "phys_riv_ln_natearth",
             "phys_lak_py_all",
             "admn_adx_ln_all_reference",
-            "carto_fea_py_all",
             "elev_dem_ras_all",
             "elev_hsh_ras_all",
             "admn_ad1_py_all_reference",
@@ -257,6 +305,7 @@ MAPS = [
         title="Country Overview with Admin 1 Boundaries",
         summary="Country overview with detail of Admin 1 boundaries and major cities",
         layers=[
+            "carto_fea_py_all",  # on top, so it fades everything outside the country
             "stle_stl_pt_natearth_cap-city",
             "tran_air_pt_ourairports_lge-med",
             "tran_por_pt_worldports",
@@ -266,7 +315,6 @@ MAPS = [
             "phys_riv_ln_natearth",
             "phys_lak_py_all",
             "admn_adx_ln_all_reference",
-            "carto_fea_py_all",
             "admn_ad1_py_all_reference",
             "admn_ad0_py_all_thematic",
             "admn_adx_py_all_reference",
@@ -278,6 +326,7 @@ MAPS = [
         title="Country Overview with Admin 2 Boundaries",
         summary="Country overview with detail of Admin 2 boundaries and major cities",
         layers=[
+            "carto_fea_py_all",  # on top, so it fades everything outside the country
             "stle_stl_pt_natearth_cap-city",
             "tran_air_pt_ourairports_lge-med",
             "tran_por_pt_worldports",
@@ -288,7 +337,6 @@ MAPS = [
             "phys_riv_ln_natearth",
             "phys_lak_py_all",
             "admn_adx_ln_all_reference",
-            "carto_fea_py_all",
             "admn_ad2_py_all_reference",
             "admn_ad1_py_all_reference",
             "admn_ad0_py_all_thematic",
@@ -301,6 +349,7 @@ MAPS = [
         title="Country Overview with Transport",
         summary="Shows country overview with transport information such as airports and ports",
         layers=[
+            "carto_fea_py_all",  # on top, so it fades everything outside the country
             "stle_stl_pt_natearth_cap-city",
             "tran_air_pt_ourairports_lge-med",
             "tran_por_pt_worldports",
@@ -312,7 +361,6 @@ MAPS = [
             "phys_riv_ln_natearth",
             "phys_lak_py_all",
             "admn_adx_ln_all_reference",
-            "carto_fea_py_all",
             "admn_ad2_py_all_reference",
             "admn_ad1_py_all_reference",
             "admn_ad0_py_all_thematic",

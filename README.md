@@ -9,11 +9,13 @@ map it:
    one to the right dataset in `2_Active_Data`; the feather layer, which
    fades everything outside the country, is made fresh from the country's
    boundary (see below),
-3. sets the projections, label language, and zoom of the Main and Location
-   maps,
+3. sets the projections, label language and country filters (e.g. only the
+   country's own ports), zooms the Main and Location maps to tidy scales, and
+   sizes the scale bar,
 4. fills in the legend and the title, map number, GLIDE number, data sources,
    disclaimer and other text, with white backgrounds behind the legend and
-   text boxes,
+   text boxes (one shared, partly transparent background for the
+   bottom-right marginalia group),
 5. saves the project and exports a JPEG,
 6. tidies the project (removes clutter inherited from the template) and sets
    it to open with the Main map, Location map and layout as tabs, the maps at
@@ -104,6 +106,7 @@ These are edited in the test copy and are never overwritten by the copy tool:
 |---|---|
 | `event_description.json` | Language switched to English (`en`); disclaimer and donor credit translated. |
 | `312_Layer_files/3121_arcpro/admn_adx_py_all_reference.lyrx`, `admn_adx_py_all_location.lyrx` | Bird Island and Navassa Island are not labelled. |
+| `312_Layer_files/3121_arcpro/admn_ad1_py_all_reference.lyrx` | Label expression put back to the standard CMF's `[ADM1_EN] & vbNewLine & [ADM1_PCODE]` (the live copy labels with `[ADM1_PCODE]` only), so the admin label language question can switch it to `ADM1_ES`. |
 | `32_Map_Templates/321_arcpro/arcpro_templates_automation_test.aprx` | Tidied with `tools/clean_template.py`: old tool and notebook history and broken connections (to the project the template was made in) removed; default geodatabase and toolbox set to `GIS/6_Pro_Default_Files`. The script also tidies every project it makes, whatever the template. |
 
 **Bird and Navassa Island labels.** The labels are hidden with
@@ -148,7 +151,7 @@ or run the real file and name the project:
 "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py --project cmf_examples\2026-ven-001
 ```
 
-At the start it asks three questions:
+At the start it asks four questions:
 
 1. **Main map projection:** ArcGIS Pro default (latitude/longitude, WGS
    1984), a UTM zone (e.g. `19N`; the project's Data Scramble Sheet lists
@@ -159,9 +162,27 @@ At the start it asks three questions:
    `GIS/3_Mapping/32_Map_Templates/321_arcpro`. For initial maps, choose a
    layout matching the country's shape; the script says how wide the country
    is compared with its height.
+4. **Admin label language:** the `xx` in the `ADM1_xx` / `ADM2_xx` name
+   fields used in admin 1 and 2 labels (default `EN`). The script lists the
+   name fields it found in the data. Admin 0 labels follow the event language.
 
 For the Venezuela test: UTM `19N`, `0` (same as Main map),
-`landscape_a3_marginalia_inside`.
+`landscape_a3_marginalia_inside`, `ES` (the data only has `ADM1_ES`).
+
+## Map scales, scale bar and legend
+
+- **Scales:** each map frame is zoomed to the country, then its scale is
+  multiplied (Location map: x2, to show the region) and **rounded up**, so the
+  country is never clipped. The rounding step grows with the scale: about a
+  twentieth of it, from the series 1, 2, 5, 10, 20, 50... (e.g. between
+  1:100,000 and 1:1,000,000 the step is 5,000, 10,000, 20,000 or 50,000). A
+  map is zoomed out by under 8%. The fitted and rounded scales are printed.
+- **Scale bar:** one division of the smallest "nice" number of km (1-9,
+  10-90, 100-900...) that makes it at least 5% of the page width. It keeps the
+  layout's alignment; its text is twice the layout's size and reads `km`.
+- **Legend:** one column on landscape layouts, two on portrait. Layer names
+  and headings are hidden (layer names are config codes), except for layers
+  given a heading in `LEGEND_HEADINGS`, e.g. "Elevation (m)" for the DEM.
 
 Outputs appear in:
 
@@ -179,7 +200,7 @@ Everything you are likely to change is in `map_automation_pro_config.py`:
 |---|---|
 | `TEST_MODE` | `True` deletes all previous outputs of the script before each run. Only works where `TEST_ENVIRONMENT.txt` exists. Set to `False` for real use. |
 | `MAPS_TO_RUN` | Map codes to build, e.g. `["MA901"]`. `None` builds all. |
-| `MAIN_MAP_PROJECTION`, `LOCATION_MAP_PROJECTION`, `LAYOUT` | Answers to the start-up questions. `None` asks; e.g. `"UTM 19N"`, `"SAME"`, `"landscape_a3_marginalia_inside"` skip the question. |
+| `MAIN_MAP_PROJECTION`, `LOCATION_MAP_PROJECTION`, `LAYOUT`, `ADMIN_LABEL_LANGUAGE` | Answers to the start-up questions. `None` asks; e.g. `"UTM 19N"`, `"SAME"`, `"landscape_a3_marginalia_inside"`, `"ES"` skip the question. |
 | `TEMPLATE_FILE` | Base project each map starts from. |
 | `PRO_DEFAULT_FILES_FOLDER`, `DEFAULT_GEODATABASE`, `DEFAULT_TOOLBOX` | Default geodatabase and toolbox of each new project (the empty placeholders in `GIS/6_Pro_Default_Files`). |
 | `FEATHER_LAYER`, `FEATHER_BACKGROUND` | The feather layer, and the global background polygon its data is made from. |
@@ -187,8 +208,11 @@ Everything you are likely to change is in `map_automation_pro_config.py`:
 | `PREFERRED_SUPPLIER`, `PREFERRED_DATASETS` | Which dataset to use when several match a layer. Anything still unclear is asked. |
 | `COUNTRY_NAME` | Country name on the map. `None` reads it from the admin 0 data, in the event language. |
 | `SOURCE_NAMES` | How data sources are written on the map (`naturalearth` → `Natural Earth`). |
-| `LEGEND_EXCLUDE` | Main map layers left out of the legend. |
-| `LAYERS`, `MAPS` | Every layer that can be used, and the map products made from them. |
+| `FRAME_EXTENTS`, `SCALE_ROUNDING_FRACTION` | The layer each map frame is zoomed to and its scale multiplier; the size of the rounding step. |
+| `SCALE_BAR_NAME`, `SCALE_BAR_MIN_WIDTH`, `SCALE_BAR_TEXT_SIZE_FACTOR`, `SCALE_BAR_UNIT_LABEL` | The scale bar: minimum width (fraction of the page), text size and unit label. |
+| `LEGEND_EXCLUDE`, `LEGEND_HEADINGS`, `LEGEND_COLUMNS_LANDSCAPE`, `LEGEND_COLUMNS_PORTRAIT` | Main map layers left out of the legend; headings shown for some layers; legend columns. |
+| `GROUP_BACKGROUNDS` | Layout groups that share one white background (with its opacity) instead of one per text box. |
+| `LAYERS`, `MAPS` | Every layer that can be used, and the map products made from them. A `LayerSpec` can hide the affected country (`exclude_affected_country`), show only it (`only_affected_country`, a field with the lower-case ISO3 code) or turn labels off (`labels=False`). A map's `layers` list is its drawing order, top first; the feather is on top. |
 
 Event details (GLIDE number, time zone, language, contact email, disclaimer,
 donor credit, JPEG resolution) come from the project's
@@ -202,6 +226,8 @@ donor credit, JPEG resolution) come from the project's
   confirmed by opening the project in ArcGIS Pro.
 - The feather is not yet added to the Location map.
 - MA002, MA003 and MA004 are defined but not tested yet.
-- Venezuela's admin 1 and 2 data only has Spanish names (`ADM1_ES`). The
-  script only switches label fields to the event language where the data has
-  them, so these labels are not affected. They currently show P-codes.
+- Only `landscape_a3_marginalia_inside` has been tested since the scale bar,
+  legend column and group background changes; the other layouts (including
+  portrait, with its two-column legend) have not.
+- Venezuela's admin 1 and 2 data only has Spanish names (`ADM1_ES`), so the
+  test answers `ES` to the admin label language question.
