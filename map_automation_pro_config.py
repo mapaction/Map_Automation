@@ -1,4 +1,4 @@
-"""Settings for map_automation_pro.py.
+"""Settings for the map automation notebook (map_automation_pro.ipynb).
 
 Event details (country ISO3, GLIDE number, time zone, language, producer
 contact, disclaimer, donor credits, JPEG resolution) are NOT set here: they

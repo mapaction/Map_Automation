@@ -1,24 +1,19 @@
-"""MapAction map automation for ArcGIS Pro.
+"""MapAction map automation for ArcGIS Pro: the functions behind the notebook.
 
 Builds map projects (.aprx) and JPEG exports from a template project, a
 layout (.pagx), layer files (.lyrx) and the data in 2_Active_Data, using the
 standard MapAction project folder structure.
 
-Run it with ArcGIS Pro's Python, from inside a project folder, e.g.:
-    "C:\\Program Files\\ArcGIS\\Pro\\bin\\Python\\Scripts\\propy.bat" map_automation_pro.py
-or point it at a project folder:
-    ... map_automation_pro.py --project C:\\path\\to\\2026-ven-001
-
-At the start it asks for the Main map and Location map projections and the
-layout (unless they are set in the config). Other settings (which maps to
-run, testing mode, layers, map definitions) are in map_automation_pro_config.py,
-next to this file. Event details are read from event_description.json at the
-root of the project folder.
+Users run map_automation_pro.ipynb, which calls the run steps at the end of
+this file (start_run, find_data, ask_questions, check_before_building,
+clear_old_outputs, build_maps) in turn. Settings (which maps to run, testing
+mode, layers, map definitions) are in map_automation_pro_config.py, next to
+this file. Event details are read from event_description.json at the root of
+the project folder.
 
 Only the standard library and arcpy are used.
 """
 
-import argparse
 import gc
 import json
 import math
@@ -37,18 +32,11 @@ from xml.sax.saxutils import escape as xml_escape
 import arcpy
 
 
-def script_dir():
-    """Folder this script was run from. Symlinks are deliberately NOT
-    resolved, so a link to the script inside a project folder finds that
-    project. Falls back to the working directory when there is no file
-    (e.g. code pasted into ArcGIS Pro's Python window)."""
-    try:
-        return Path(__file__).absolute().parent
-    except NameError:
-        return Path.cwd()
+# Folder this file was loaded from. Symlinks are deliberately NOT resolved,
+# so a link to this file inside a project folder finds that project.
+LIB_DIR = Path(__file__).absolute().parent
 
-
-sys.path.insert(0, str(script_dir()))
+sys.path.insert(0, str(LIB_DIR))
 import map_automation_pro_config as cfg  # noqa: E402
 
 TEST_MARKER = "TEST_ENVIRONMENT.txt"
@@ -63,13 +51,11 @@ LOCATION = "Location map"
 def find_project_root(start):
     """Walk up from `start` to the project root: the first folder holding both
     event_description.json and a GIS folder (GIS itself holds a blank copy of
-    event_description.json, which is skipped)."""
+    event_description.json, which is skipped). Returns None if there is none."""
     for folder in (start, *start.parents):
         if (folder / "event_description.json").is_file() and (folder / "GIS").is_dir():
             return folder
-    raise SystemExit(
-        f"No project folder (with event_description.json and GIS/) found above {start}.\n"
-        "Run the script from inside a project folder, or use --project <folder>.")
+    return None
 
 
 @dataclass(frozen=True)
@@ -1226,20 +1212,29 @@ def build_map(map_spec, resolved, event, choices, paths):
 
 
 # =============================================================================
-# Main
+# Run steps (called in turn by the notebook, one per cell)
 # =============================================================================
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="MapAction map automation for ArcGIS Pro.")
-    parser.add_argument("--project", type=Path,
-                        help="project folder (default: the one containing this script)")
-    return parser.parse_args()
+@dataclass(frozen=True)
+class Run:
+    """The project and the maps to build on this run."""
+    paths: ProjectPaths
+    event: Event
+    template: Path
+    maps: list        # MapSpecs to build
+    specs: list       # LayerSpecs those maps use
+    started: float    # time.time() at the start
 
 
-def main():
-    start = time.time()
-    args = parse_args()
-    root = find_project_root((args.project or script_dir()).absolute())
+def start_run(project_folder=None):
+    """Find the project, read its event details and check the config.
+    project_folder: any folder inside the project; by default the notebook's
+    folder (the working directory) or, failing that, this file's folder."""
+    starts = [Path(project_folder)] if project_folder else [Path.cwd(), LIB_DIR]
+    root = next((r for r in (find_project_root(s.absolute()) for s in starts) if r), None)
+    if root is None:
+        raise SystemExit(f"No project folder (with event_description.json and GIS/) found above "
+                         f"{starts[0]}. Set PROJECT_FOLDER to a folder inside the project.")
     paths = ProjectPaths.from_root(root)
     event = Event.from_json(root / "event_description.json")
     print(f"Map automation for {event.operation_id} ({root})")
@@ -1259,56 +1254,77 @@ def main():
     maps = [m for m in cfg.MAPS if cfg.MAPS_TO_RUN is None or m.code in cfg.MAPS_TO_RUN]
     used_names = {name for m in maps for name in m.layers}
     specs = [s for s in cfg.LAYERS if s.layer in used_names]
+    print(f"Maps to build: {', '.join(m.code for m in maps)}")
+    return Run(paths, event, template, maps, specs, time.time())
 
-    # Data first: choosing datasets may need questions too.
-    print("\nFinding data")
-    feather_specs = [s for s in specs if s.layer == cfg.FEATHER_LAYER]
-    resolved = resolve_datasets([s for s in specs if s not in feather_specs], event, paths)
+
+def find_data(run):
+    """Find the dataset for each layer (may ask questions) and make the
+    feather. Returns {LayerSpec: dataset Path}."""
+    print("Finding data")
+    feather_specs = [s for s in run.specs if s.layer == cfg.FEATHER_LAYER]
+    resolved = resolve_datasets([s for s in run.specs if s not in feather_specs], run.event, run.paths)
     if feather_specs:
-        feather = make_feather(admin0_dataset(resolved), event, paths)
+        feather = make_feather(admin0_dataset(resolved), run.event, run.paths)
         if feather:
             resolved.update({spec: feather for spec in feather_specs})
     for spec, dataset in resolved.items():
         print(f"  {spec.frame:12} {spec.layer:32} -> {dataset.name}")
+    return resolved
 
-    # Questions for the whole run.
-    scramble_url = paths.data_scramble_sheet_url()
+
+def ask_questions(run, resolved):
+    """Ask the projections, layout and admin label language (unless set in
+    the config). Returns the RunChoices used for every map."""
+    scramble_url = run.paths.data_scramble_sheet_url()
     main_projection = projection_setting(cfg.MAIN_MAP_PROJECTION, MAIN, "MAIN_MAP_PROJECTION", scramble_url)
     location_projection = projection_setting(cfg.LOCATION_MAP_PROJECTION, LOCATION,
                                              "LOCATION_MAP_PROJECTION", scramble_url, main=main_projection)
     admin0 = admin0_dataset(resolved)
     hint = country_shape_hint(admin0, main_projection) if admin0 else ""
-    layout = choose_layout(paths, hint)
+    layout = choose_layout(run.paths, hint)
     admin_language = choose_admin_language(resolved)
-    choices = RunChoices(template, layout, main_projection, location_projection,
-                         country_name(admin0, event), admin_language)
+    choices = RunChoices(run.template, layout, main_projection, location_projection,
+                         country_name(admin0, run.event), admin_language)
 
     print(f"\nMain map:     {pretty_name(main_projection)}")
     print(f"Location map: {pretty_name(location_projection)}")
     print(f"Layout:       {layout.stem}")
     print(f"Country:      {choices.country}")
     print(f"Admin labels: ADM1_{admin_language} / ADM2_{admin_language}")
+    return choices
 
-    warnings = check_layer_files(specs, paths) + check_label_fields(resolved, event, admin_language)
+
+def check_before_building(run, resolved, choices):
+    """Print warnings about missing layer files, label fields, default files
+    and data. The maps are still built."""
+    paths = run.paths
+    warnings = (check_layer_files(run.specs, paths)
+                + check_label_fields(resolved, run.event, choices.admin_language))
     warnings += [f"{path} not found, so ArcGIS Pro will ask for it when a new project is opened"
                  for path in (paths.default_geodatabase(), paths.default_toolbox()) if not path.exists()]
     warnings += [f"no data found for '{s.layer}' ({s.frame}): {s.prefix} {s.pattern} in {s.folder}"
-                 for s in specs if s not in resolved]
-    if warnings:
-        print("\nWarnings (these maps will still be built):")
-        for warning in warnings:
-            print("  -", warning)
+                 for s in run.specs if s not in resolved]
+    if not warnings:
+        print("No problems found.")
+        return
+    print("Warnings (these maps will still be built):")
+    for warning in warnings:
+        print("  -", warning)
 
-    if cfg.TEST_MODE:
-        print("\nTest mode: deleting previous outputs")
-        clear_outputs(paths)
 
-    for map_spec in maps:
+def clear_old_outputs(run):
+    """In testing mode, delete the previous outputs; otherwise do nothing."""
+    if not cfg.TEST_MODE:
+        print("Test mode is off: previous outputs are kept, and new versions added.")
+        return
+    print("Test mode: deleting previous outputs")
+    clear_outputs(run.paths)
+
+
+def build_maps(run, resolved, choices):
+    """Build, export and tidy every map of the run."""
+    for map_spec in run.maps:
         map_resolved = {s: d for s, d in resolved.items() if s.layer in map_spec.layers}
-        build_map(map_spec, map_resolved, event, choices, paths)
-
-    print(f"\nDone: {len(maps)} map(s) in {time.time() - start:.0f}s")
-
-
-if __name__ == "__main__":
-    main()
+        build_map(map_spec, map_resolved, run.event, choices, run.paths)
+    print(f"\nDone: {len(run.maps)} map(s) in {time.time() - run.started:.0f}s")
