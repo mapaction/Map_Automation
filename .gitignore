@@ -1,18 +1,7 @@
-# Test data: ~400 MB of GIS data, rebuilt from the live project with
-# tools/copy_test_data.py (see README.md)
-cmf_examples/*/GIS/2_Active_Data/
-
-# Script outputs
-cmf_examples/*/GIS/3_Mapping/33_Map_Projects/*
-cmf_examples/*/GIS/3_Mapping/34_Map_Products_MapAction/*
-!cmf_examples/*/GIS/3_Mapping/33_Map_Projects/.gitkeep
-!cmf_examples/*/GIS/3_Mapping/34_Map_Products_MapAction/.gitkeep
-
-# ArcGIS Pro default files: keep the standard CMF's empty placeholders, ignore
-# anything else Pro puts there
-*/*/GIS/6_Pro_Default_Files/*
-!*/*/GIS/6_Pro_Default_Files/Default.tbx
-!*/*/GIS/6_Pro_Default_Files/MapActionDefault.gdb/
+# Example projects: too large for git, kept on Google Drive instead.
+# cmf_examples/README.txt has the links and setup steps.
+cmf_examples/*
+!cmf_examples/README.txt
 
 # ArcGIS Pro and Python clutter
 __pycache__/

@@ -17,13 +17,16 @@ README.md first for the user-facing picture.
   - `map_automation_pro_config.py`: settings.
   - The notebook is committed with no outputs. If it was run in Pro, clear
     them before committing (Pro saves outputs into the file via the symlink).
+  - `cmf_examples/`: example projects, downloaded from Google Drive and not
+    tracked by git (see "The test copy").
 - **Constraint:** standard library + ArcGIS Pro's `arcgispro-py3` env only
   (an organisational rule). No pip/conda packages in the script. If a task
   has an easier solution outside this (e.g. geopandas), **ask the user
   first** rather than using it.
-- **Symlinks on Windows:** Developer Mode is on, and `core.symlinks=true` is set
-  for this repo. Create links with `cmd /c mklink`; PowerShell 5.1's
-  `New-Item -ItemType SymbolicLink` still demands admin.
+- **Symlinks on Windows:** Developer Mode is on. Create links with
+  `cmd /c mklink`; PowerShell 5.1's `New-Item -ItemType SymbolicLink` still
+  demands admin. The links are not in git (see "The test copy"); the
+  commands are in `cmf_examples/README.txt`.
 
 ## The three folders
 
@@ -60,12 +63,23 @@ files with arcpy** (that can leave lock files). To read inside a live
 ### The test copy
 
 `cmf_examples/2026-ven-001` is a cut-down copy with the same structure.
-`GIS/2_Active_Data` is git-ignored; fill it with
-`python tools/copy_test_data.py` (reads the files in
-`tools/test_data_manifest.txt` from live). Files deliberately edited in the
-test copy are listed in README.md and in `LOCAL_CHANGES` in the tool, and are
-never overwritten. If the script starts using a new file, add it to the
-manifest.
+**Nothing in `cmf_examples/` is tracked by git** except
+`cmf_examples/README.txt` (the Google Drive download links and setup
+steps). The example projects are zipped and kept on Google Drive; locally,
+the folder is unzipped there and the symlinks are made by hand.
+
+- `python tools/copy_test_data.py` updates the test copy from live (reads the
+  files in `tools/test_data_manifest.txt`). Files deliberately edited in
+  the test copy are listed in README.md and in `LOCAL_CHANGES` in the tool,
+  and are never overwritten. If the script starts using a new file, add it
+  to the manifest.
+- After changing an example, `python tools/zip_example.py 2026-ven-001`
+  writes `../2026-ven-001.zip` (no symlinks, outputs or clutter) for the
+  user to upload to Drive. Don't upload it yourself. If the link changes,
+  update `cmf_examples/README.txt`.
+- Since the examples aren't in git, changes to them (e.g. a `LOCAL_CHANGES`
+  file) don't show in `git status` or diffs. Mention them to the user so
+  the Drive copy gets updated.
 
 ## Running and testing
 

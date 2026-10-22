@@ -35,7 +35,7 @@ are involved in this work:
    `cmf_examples/`.
 2. **The live Venezuela CMF** (`Nextcloud/Projects/2026/2026-ven-001`): used
    by MapAction for the response and synced to colleagues through Nextcloud.
-   Many of the test files were copied from it. It is **never edited** from
+   The Venezuela test copy's files came from it. It is **never edited** from
    here.
 3. **The standard CMF** (`Documents/repos/default-crash-move-folder`, the
    `mapaction/default-crash-move-folder` repository): the empty CMF that every
@@ -54,26 +54,53 @@ map_automation_pro.ipynb       the notebook users run, step by step
 map_automation_pro_lib.py      the functions behind the notebook
 map_automation_pro_config.py   settings: which maps, layers, testing mode...
 README.md, CLAUDE.md           this guide, and notes for Claude Code sessions
-tools/                         fills in the test data from the live project;
-                               tidies the test copy's map template; runs the
-                               notebook from the command line for testing
+tools/                         runs the notebook from the command line for
+                               testing; zips an example project for Google
+                               Drive; refreshes the test data from the live
+                               project; tidies the test copy's map template
+cmf_examples/README.txt        download links and setup steps for the
+                               example projects (not stored in git, see below)
+```
+
+## Setting up the example projects
+
+The example projects are too large for git, so they are kept on MapAction's
+Google Drive. Git ignores everything in `cmf_examples/` except
+`README.txt`, which lists the download links and the setup steps:
+
+1. download each zip and unzip it into `cmf_examples/`,
+2. check the folder structure (e.g. `cmf_examples/2026-ven-001/event_description.json`),
+3. create the symlinks.
+
+Once unzipped, the Venezuela example looks like this:
+
+```
 cmf_examples/2026-ven-001/     test copy of the Venezuela project (see below)
   event_description.json       event details used by the script
   cmf_description.json         where the standard folders are
   TEST_ENVIRONMENT.txt         marks this as a test copy (allows testing mode)
+  GIS/2_Active_Data/           the GIS data
+  GIS/3_Mapping/               layer files, templates and layouts; the
+                               script's outputs go in 33_ and 34_
   GIS/6_Pro_Default_Files/     empty default geodatabase and toolbox, copied
                                from the standard CMF; every new project uses them
   GIS/7_Python/71_Jupyter/map_automation/
-                               links (symlinks) to the three files above
+                               links (symlinks) to the three script files
 ```
 
-The real files are at the top of the repository, so the same notebook can
-be tested against other example projects in `cmf_examples` later. Each
-example project gets links to them in `GIS/7_Python/71_Jupyter/map_automation/`.
+The script files are at the top of the repository, so the same notebook can
+be tested against several example projects. Each example project gets
+symlinks to them in `GIS/7_Python/71_Jupyter/map_automation/`, so it always
+runs the current version. On Windows, creating symlinks needs **Developer
+Mode** (Settings › System › For developers); create them with `mklink`
+(the commands are in `cmf_examples/README.txt`).
 
-Git stores the links as symlinks. On Windows, creating symlinks needs
-**Developer Mode** (Settings › System › For developers) and
-`git config core.symlinks true` (already set in this repository).
+**Updating an example on Google Drive.** After changing an example project
+(e.g. a new data file, or a file in the table below), zip it with
+`python tools/zip_example.py 2026-ven-001`. This leaves out the symlinks,
+the script's outputs and clutter, and writes `../2026-ven-001.zip` next to
+the repository. Upload it to Google Drive in place of the old one. If the
+link changes, update `cmf_examples/README.txt`.
 
 ## The test environment and the live Venezuela project
 
@@ -87,8 +114,9 @@ The live project is synced to other users through Nextcloud. **Never edit it
 from here, and never run the script in testing mode against it.** All
 development and test runs happen in the copy.
 
-The GIS data (`GIS/2_Active_Data`) is too large for git and is not stored in
-the repository. To fill it in, run:
+The copy comes from Google Drive (see above). If you have the live project
+in Nextcloud, you can also bring its data files up to date (or add a file
+the script has started using) with:
 
 ```
 python tools/copy_test_data.py            # copy missing files only
@@ -96,11 +124,13 @@ python tools/copy_test_data.py --refresh  # also update files changed in the liv
 ```
 
 This only reads from the live project. The list of files is in
-`tools/test_data_manifest.txt`.
+`tools/test_data_manifest.txt`; add any new file the script uses. Then zip
+and re-upload the example (see above), so others get the change.
 
 ### Files deliberately different from the live project
 
-These are edited in the test copy and are never overwritten by the copy tool:
+These are edited in the test copy (and so in the Google Drive zip) and are
+never overwritten by the copy tool:
 
 | File | Change |
 |---|---|
