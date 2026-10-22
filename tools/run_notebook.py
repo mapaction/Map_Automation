@@ -19,9 +19,9 @@ from pathlib import Path
 def main():
     notebook = Path(sys.argv[1] if len(sys.argv) > 1 else "map_automation_pro.ipynb")
     cells = json.loads(notebook.read_text(encoding="utf-8"))["cells"]
-    # In Jupyter the notebook's folder (the working directory) is on the
-    # import path; when run as a script, this file's folder is instead.
-    sys.path[0] = str(Path.cwd())
+    # Not on the import path by default: the notebook's first cell adds the
+    # folder it loads the script from (here, the working directory).
+    sys.path.pop(0)
     namespace = {"__name__": "__main__"}
     for number, cell in enumerate(cells):
         if cell["cell_type"] == "code":

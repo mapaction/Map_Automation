@@ -18,9 +18,11 @@ README.md first for the user-facing picture.
   - The notebook is committed with no outputs. If it was run in Pro, clear
     them before committing (Pro saves outputs into the file via the symlink).
   - `map_automation_pro.aprx`: an empty Pro project that users open before
-    the notebook. Pro runs a notebook in the open project's home folder,
-    not the notebook's folder, so without it the imports fail (found on the
-    first run in Pro). Made by `tools/make_notebook_project.py` (run with
+    the notebook. In Pro, a notebook's working directory is the user's
+    home folder (`C:\Users\hmatc`), and it isn't on `sys.path`. So the first
+    cell puts `arcpy.mp.ArcGISProject("CURRENT").homeFolder` (this
+    project's folder, i.e. the notebook's) on `sys.path`; outside Pro,
+    `"CURRENT"` raises `OSError` and it uses the working directory. Made by `tools/make_notebook_project.py` (run with
     `propy.bat`) from the test copy's template; paths relative to
     `GIS/7_Python/71_Jupyter/map_automation`, no stored `homeFolder`.
     Rebuild it rather than editing it. If Pro saved it through the symlink
@@ -105,9 +107,9 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
 - PowerShell piping adds a BOM; `ask()` strips it. Piping from Git Bash into
   `propy.bat` has quoting problems, so use PowerShell.
 - The project is found by walking up from the working directory (in
-  Pro, the open project's home folder: the notebook's folder once
-  `map_automation_pro.aprx` is open), then from the lib's **unresolved** path
-  (`Path(__file__).absolute()`, never `.resolve()`). So run from the symlink
+  Pro, the user's home folder, so this finds nothing), then from the lib's
+  **unresolved** path (`Path(__file__).absolute()`, never `.resolve()`; in
+  Pro, `map_automation_pro.aprx`'s folder, see above). So run from the symlink
   folder, or set `PROJECT_FOLDER` in the notebook's first code cell.
 - arcpy needs ArcGIS Pro signed in. "The Product License has not been
   initialized" means the user must sign in to Pro; ask them.
@@ -205,8 +207,10 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
 - The first run inside ArcGIS Pro (the live Venezuela project, which has a
   plain copy of the script, with `TEST_MODE = False`, in
   `GIS/7_Python/71_Jupyter/map_automation/`) failed with
-  `ModuleNotFoundError`: the kernel's working directory is the open
-  project's home folder. `map_automation_pro.aprx` is the fix; still to
+  `ModuleNotFoundError`, even with `map_automation_pro.aprx` open: the
+  kernel's working directory is the user's home folder and isn't on
+  `sys.path` (checked in Pro: the project's `homeFolder` was right).
+  Loading from `ArcGISProject("CURRENT").homeFolder` is the fix; still to
   confirm in Pro, along with `input()` prompts working. The live copy
   doesn't update itself: after a fix, the user copies the changed files
   across (writes to live need the user's say-so each time).

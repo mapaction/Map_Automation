@@ -180,11 +180,12 @@ In ArcGIS Pro (signed in):
 3. Run the cells from the top, one at a time (Ctrl+Enter) or with **Run All
    Cells**. Each step has a short explanation above it.
 
-ArcGIS Pro runs a notebook from the open project's home folder (the folder
-of its `.aprx`), not from the notebook's own folder. Opening
-`map_automation_pro.aprx` makes that the notebook's folder, so the notebook
-finds `map_automation_pro_lib.py`, the settings and the project it sits in.
-If another project is open, the first cell stops with a message saying so.
+ArcGIS Pro runs every notebook from the user's home folder (e.g.
+`C:\Users\<name>`), not from the notebook's own folder, so the notebook
+can't find its files by itself. Its first cell instead loads them from the
+open project's home folder, which for `map_automation_pro.aprx` is the
+notebook's folder. From there it also finds the project it sits in. If
+another project is open, the first cell stops with a message saying so.
 To build maps for a different project, set `PROJECT_FOLDER` in the first
 code cell.
 
@@ -273,9 +274,10 @@ donor credit, JPEG resolution) come from the project's
 
 - **MA901** builds cleanly from the test data (about 40 seconds).
 - The notebook has been tested from the command line
-  (`tools/run_notebook.py`). The first try inside ArcGIS Pro (in the live
-  Venezuela project) failed because Pro ran it from another project's
-  folder; `map_automation_pro.aprx` is the fix, not yet tried in Pro.
+  (`tools/run_notebook.py`). The first tries inside ArcGIS Pro (in the live
+  Venezuela project) failed because Pro runs notebooks from the user's
+  home folder; loading the files from `map_automation_pro.aprx`'s folder is
+  the fix, not yet tried in Pro.
 - The feather, default geodatabase and toolbox, project tidying and opening
   tabs are new; the tabs and tidying are checked with arcpy but not yet
   confirmed by opening the project in ArcGIS Pro.
