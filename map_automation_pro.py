@@ -211,7 +211,7 @@ def ask_projection(frame_name, config_name, scramble_url, main=None):
     if main is not None:
         print(f"  0: same as the Main map ({pretty_name(main)})")
     print("  1: ArcGIS Pro default (latitude/longitude, WGS 1984)")
-    hint = f": {scramble_url}" if scramble_url else " in the project folder"
+    hint = f": {scramble_url}" if scramble_url else ""
     print(f"  2: UTM zone, e.g. 19N (not sure? check the Data Scramble Sheet{hint})")
     print("  3: EPSG or ESRI code, e.g. 32619")
     while True:
@@ -769,11 +769,34 @@ def style_layout(layout):
     layout.setDefinition(definition)
 
 
-def update_text(layout, map_spec, version, event, country, sources, main_projection):
-    """Fill in the layout's text elements."""
+ISO_PAGE_SIZES = {(1189, 841): "A0", (841, 594): "A1", (594, 420): "A2",
+                  (420, 297): "A3", (297, 210): "A4"}  # mm, long side first
+
+
+def scale_text(layout):
+    """The Main map's scale as the off-page 'scale' element shows it, e.g.
+    '1: 5,200,000 (At A3)'; the page size is left out if it isn't an ISO size."""
+    frames = layout.listElements("MAPFRAME_ELEMENT", MAIN)
+    if not frames:
+        return ""
+    text = f"1: {round(frames[0].camera.scale):,}"
+    to_mm = MM_PER_PAGE_UNIT.get(layout.pageUnits)
+    if to_mm:
+        page = sorted((round(layout.pageWidth * to_mm), round(layout.pageHeight * to_mm)), reverse=True)
+        size = ISO_PAGE_SIZES.get(tuple(page))
+        if size:
+            text += f" (At {size})"
+    return text
+
+
+def update_text(layout, map_spec, version, event, country, sources, main_projection, map_name):
+    """Fill in the layout's text elements. map_name is the project's file
+    name without the extension, e.g. MA901-v01-country-overview-..."""
     texts = {
         "title": map_spec.title,
         "summary": map_spec.summary,
+        "map_name": map_name,
+        "scale": scale_text(layout),
         "map_no": f"{map_spec.code} {version}",
         "country": country,
         "glide_no": event.glide,
@@ -1216,7 +1239,8 @@ def build_map(map_spec, resolved, event, choices, paths):
     progress("filling in the legend, styling and text")
     fill_legend(layout, aprx.listMaps(MAIN)[0])
     style_layout(layout)
-    update_text(layout, map_spec, version, event, choices.country, sources, choices.main_projection)
+    update_text(layout, map_spec, version, event, choices.country, sources, choices.main_projection,
+                base_name)
     save_with_retry(aprx)
     progress("exporting the JPEG")
     layout.exportToJPEG(str(jpeg_file), resolution=event.jpeg_dpi)

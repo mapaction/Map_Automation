@@ -290,3 +290,8 @@ donor credit, JPEG resolution) come from the project's
   portrait, with its two-column legend) have not.
 - Venezuela's admin 1 and 2 data only has Spanish names (`ADM1_ES`), so the
   test answers `ES` to the admin label language question.
+
+## Contributors
+
+Work by Darren Connaghan, Harry Matchette-Downes, and possibly others in the
+unpublished ArcMap version.
