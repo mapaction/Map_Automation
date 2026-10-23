@@ -214,6 +214,12 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
   half-built `MA901-v14`/`v15` from the notebook tries were deleted (at
   the user's request), so its next MA901 is `v14`. Writing to live needs
   the user's say-so each time; the live copy doesn't update itself.
+  Last copied: `map_automation_pro.py` from commit `639e2e6`.
+- Decided by the user (Oct 2026): the off-page `language` text element
+  stays as the layout's fixed text (not set from the event); and the live
+  `event_description.json`, whose disclaimer and donor credit are in
+  Spanish although `language_iso2` is `en`, is not to be translated by
+  Claude.
 - At release, the script goes in the standard CMF's
   `20YYiso3nn/GIS/7_Python/map_automation/` (a new folder; `7_Python`
   itself exists). The standard CMF's
