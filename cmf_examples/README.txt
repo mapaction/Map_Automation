@@ -29,9 +29,7 @@ cmf_examples itself, or move the inner folder up a level.
 It should look like this (only the main folders are shown):
 
     Map_Automation\                      (the repository)
-      map_automation_pro.aprx
-      map_automation_pro.ipynb
-      map_automation_pro_lib.py
+      map_automation_pro.py
       map_automation_pro_config.py
       cmf_examples\
         README.txt                       (this file)
@@ -48,52 +46,42 @@ It should look like this (only the main folders are shown):
               34_Map_Products_MapAction\ (empty: the script's JPEG outputs)
             6_Pro_Default_Files\
             7_Python\
-              71_Jupyter\
+              72_Scripts\
                 map_automation\          (empty until step 3)
 
 event_description.json and the GIS folder must be directly inside
-2026-ven-001, not one level further down.
+2026-ven-001, not one level further down. (Older zips have an empty
+7_Python\71_Jupyter\map_automation folder instead of 72_Scripts; step 3
+creates the new folder, and the old one can be deleted.)
 
 
-3) Set up the symlinks (and copy the project file)
---------------------------------------------------
+3) Set up the symlinks
+----------------------
 
-The notebook and its two Python files live at the top of the repository.
-Each example project needs links (symlinks) to them in its
-GIS\7_Python\71_Jupyter\map_automation folder, so it always runs the
+The script and its settings file live at the top of the repository. Each
+example project needs links (symlinks) to them in its
+GIS\7_Python\72_Scripts\map_automation folder, so it always runs the
 current version.
-
-The empty ArcGIS Pro project opened before the notebook
-(map_automation_pro.aprx) must be a real copy, NOT a link: ArcGIS Pro
-follows the link and works out the project's folders from the repository
-root, so it would put its default geodatabase in C:\Users\<name> and load
-the notebook's files from the wrong place. The example zips already
-include this copy.
 
 Creating symlinks on Windows needs Developer Mode turned on:
 Settings > System > For developers > Developer Mode.
 
 Then, in PowerShell, from the repository folder (Map_Automation):
 
-    Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
-    cmd /c mklink map_automation_pro.ipynb ..\..\..\..\..\..\map_automation_pro.ipynb
-    cmd /c mklink map_automation_pro_lib.py ..\..\..\..\..\..\map_automation_pro_lib.py
+    New-Item -ItemType Directory -Force cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
+    Set-Location cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
+    cmd /c mklink map_automation_pro.py ..\..\..\..\..\..\map_automation_pro.py
     cmd /c mklink map_automation_pro_config.py ..\..\..\..\..\..\map_automation_pro_config.py
-    Copy-Item ..\..\..\..\..\..\map_automation_pro.aprx .
     Get-ChildItem
 
-(The same three mklink lines work in a Command Prompt, without "cmd /c";
-there, use "copy" instead of Copy-Item. PowerShell's own
-New-Item -ItemType SymbolicLink needs admin rights, so use mklink.)
+(The two mklink lines work in a Command Prompt too, without "cmd /c".
+PowerShell's own New-Item -ItemType SymbolicLink needs admin rights, so use
+mklink.)
 
-Get-ChildItem should list the three script files as links (mode
-"-a---l") and map_automation_pro.aprx as a normal file (mode "-a----").
+Get-ChildItem should list both files as links (mode "-a---l").
 For another example project, replace 2026-ven-001 with its folder name.
 
-When map_automation_pro.aprx is rebuilt (tools/make_notebook_project.py),
-the tool updates the test copy's version too; copy it again into any other
-example project.
+Then run the test from that folder, as described in the repository's
+README.md ("Running the script"):
 
-Then run the test as described in the repository's README.md
-("Running the notebook"): in ArcGIS Pro, open map_automation_pro.aprx
-from that folder first, then the notebook from its Catalog pane.
+    "2", "19N", "0", "3", "ES" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py

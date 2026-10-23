@@ -11,7 +11,7 @@ It only edits the template's GISProject.json; the maps and layouts are not
 touched. Like testing mode, it only runs in a project with a
 TEST_ENVIRONMENT.txt file. Close the template in ArcGIS Pro first.
 
-Usage (ArcGIS Pro's Python, since it reuses map_automation_pro_lib.py):
+Usage (ArcGIS Pro's Python, since it reuses map_automation_pro.py):
     propy.bat tools/clean_template.py [PROJECT_FOLDER]
 """
 
@@ -21,8 +21,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import map_automation_pro_lib as automation  # noqa: E402
-from map_automation_pro_lib import cfg  # noqa: E402
+import map_automation_pro as automation  # noqa: E402
+from map_automation_pro import cfg  # noqa: E402
 
 
 def main():

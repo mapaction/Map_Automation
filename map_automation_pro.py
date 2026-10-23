@@ -1,19 +1,30 @@
-"""MapAction map automation for ArcGIS Pro: the functions behind the notebook.
+r"""MapAction map automation for ArcGIS Pro.
 
 Builds map projects (.aprx) and JPEG exports from a template project, a
 layout (.pagx), layer files (.lyrx) and the data in 2_Active_Data, using the
 standard MapAction project folder structure.
 
-Users run map_automation_pro.ipynb, which calls the run steps at the end of
-this file (start_run, find_data, ask_questions, check_before_building,
-clear_old_outputs, build_maps) in turn. Settings (which maps to run, testing
-mode, layers, map definitions) are in map_automation_pro_config.py, next to
-this file. Event details are read from event_description.json at the root of
-the project folder.
+Run it with ArcGIS Pro's Python, from the project's
+GIS/7_Python/72_Scripts/map_automation folder (ArcGIS Pro installed and
+signed in):
+
+    "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
+
+It finds the project it sits in (or use --project FOLDER), asks a few
+questions, and builds the maps. main() at the end runs the steps in turn
+(start_run, find_data, ask_questions, check_before_building,
+clear_old_outputs, build_maps). Settings (which maps to run, testing mode,
+layers, map definitions) are in map_automation_pro_config.py, next to this
+file. Event details are read from event_description.json at the root of the
+project folder.
+
+Don't run it inside ArcGIS Pro (its Python window or a notebook): there,
+arcpy hangs while editing the new projects.
 
 Only the standard library and arcpy are used.
 """
 
+import argparse
 import gc
 import json
 import math
@@ -32,11 +43,11 @@ from xml.sax.saxutils import escape as xml_escape
 import arcpy
 
 
-# Folder this file was loaded from. Symlinks are deliberately NOT resolved,
+# Folder this file was run from. Symlinks are deliberately NOT resolved,
 # so a link to this file inside a project folder finds that project.
-LIB_DIR = Path(__file__).absolute().parent
+SCRIPT_DIR = Path(__file__).absolute().parent
 
-sys.path.insert(0, str(LIB_DIR))
+sys.path.insert(0, str(SCRIPT_DIR))
 import map_automation_pro_config as cfg  # noqa: E402
 
 TEST_MARKER = "TEST_ENVIRONMENT.txt"
@@ -1228,7 +1239,7 @@ def build_map(map_spec, resolved, event, choices, paths):
 
 
 # =============================================================================
-# Run steps (called in turn by the notebook, one per cell)
+# Run steps (called in turn by main)
 # =============================================================================
 
 @dataclass(frozen=True)
@@ -1244,13 +1255,14 @@ class Run:
 
 def start_run(project_folder=None):
     """Find the project, read its event details and check the config.
-    project_folder: any folder inside the project; by default the notebook's
-    folder (the working directory) or, failing that, this file's folder."""
-    starts = [Path(project_folder)] if project_folder else [Path.cwd(), LIB_DIR]
+    project_folder: any folder inside the project; by default this file's
+    folder or, failing that, the working directory."""
+    starts = [Path(project_folder)] if project_folder else [SCRIPT_DIR, Path.cwd()]
     root = next((r for r in (find_project_root(s.absolute()) for s in starts) if r), None)
     if root is None:
         raise SystemExit(f"No project folder (with event_description.json and GIS/) found above "
-                         f"{starts[0]}. Set PROJECT_FOLDER to a folder inside the project.")
+                         f"{starts[0]}. Run the script from inside the project, or add "
+                         "--project <a folder inside the project>.")
     paths = ProjectPaths.from_root(root)
     event = Event.from_json(root / "event_description.json")
     print(f"Map automation for {event.operation_id} ({root})")
@@ -1344,3 +1356,24 @@ def build_maps(run, resolved, choices):
         map_resolved = {s: d for s, d in resolved.items() if s.layer in map_spec.layers}
         build_map(map_spec, map_resolved, run.event, choices, run.paths)
     print(f"\nDone: {len(run.maps)} map(s) in {time.time() - run.started:.0f}s")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="MapAction map automation for ArcGIS Pro.")
+    parser.add_argument("--project", type=Path,
+                        help="any folder inside the project (default: the folder this script is in)")
+    args = parser.parse_args()
+
+    run = start_run(args.project)
+    print()
+    resolved = find_data(run)
+    choices = ask_questions(run, resolved)
+    print()
+    check_before_building(run, resolved, choices)
+    print()
+    clear_old_outputs(run)
+    build_maps(run, resolved, choices)
+
+
+if __name__ == "__main__":
+    main()

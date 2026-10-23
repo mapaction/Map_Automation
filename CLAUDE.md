@@ -1,39 +1,30 @@
 # CLAUDE.md
 
-Development repo for MapAction's ArcGIS Pro map automation notebook. Read
+Development repo for MapAction's ArcGIS Pro map automation script. Read
 README.md first for the user-facing picture.
 
 ## Key facts
 
 - **Files:** at the repo root. Each example project links to them with
-  **symlinks** in `cmf_examples/<project>/GIS/7_Python/71_Jupyter/map_automation/`
-  (except `map_automation_pro.aprx`, which is copied; see below).
+  **symlinks** in `cmf_examples/<project>/GIS/7_Python/72_Scripts/map_automation/`.
   Edit the root files only.
-  - `map_automation_pro.ipynb`: what users run, in ArcGIS Pro. Aimed at
-    non-Python users: a markdown cell before each code cell, and each code
-    cell is one call to a run step. Keep it that short; logic goes in the lib.
-  - `map_automation_pro_lib.py`: all the functions. The run steps the
-    notebook calls are at the end (`start_run`, `find_data`, `ask_questions`,
-    `check_before_building`, `clear_old_outputs`, `build_maps`).
+  - `map_automation_pro.py`: the script users run with `propy.bat`, from
+    that folder. All the functions; `main()` at the end calls the run steps
+    in turn (`start_run`, `find_data`, `ask_questions`,
+    `check_before_building`, `clear_old_outputs`, `build_maps`). Users are
+    not Python users: keep the printed messages plain.
   - `map_automation_pro_config.py`: settings.
-  - The notebook is committed with no outputs. If it was run in Pro, clear
-    them before committing (Pro saves outputs into the file via the symlink).
-  - `map_automation_pro.aprx`: an empty Pro project that users open before
-    the notebook. In Pro, a notebook's working directory is the user's
-    home folder (`C:\Users\hmatc`), and it isn't on `sys.path`. So the first
-    cell puts `arcpy.mp.ArcGISProject("CURRENT").homeFolder` (this
-    project's folder, i.e. the notebook's) on `sys.path`; outside Pro,
-    `"CURRENT"` raises `OSError` and it uses the working directory. Made by `tools/make_notebook_project.py` (run with
-    `propy.bat`) from the test copy's template; paths relative to
-    `GIS/7_Python/71_Jupyter/map_automation`, no stored `homeFolder`.
-    Rebuild it rather than editing it; the tool writes both the repo root's
-    copy and the test copy's. **The test copy's is a real file, not a
-    symlink:** ArcGIS Pro (unlike arcpy) follows the link and resolves the
-    relative paths and home folder from the repo root. With a link, Pro
-    created `C:\Users\hmatc\6_Pro_Default_Files` and a
-    `RasterFunctionTemplates` folder in the repo root.
   - `cmf_examples/`: example projects, downloaded from Google Drive and not
     tracked by git (see "The test copy").
+- **Not a notebook, and never run inside ArcGIS Pro.** In Oct 2026 it was a
+  Jupyter notebook in `71_Jupyter` for a while. Inside Pro,
+  `aprx.deleteItem` on the new (not the open) project hung with no error,
+  in both the live and test projects; the same code runs fine from
+  `propy.bat`. The user then chose a script in `72_Scripts`. Also found
+  then: a Pro notebook's working directory is the user's home folder and
+  isn't on `sys.path`; and Pro follows a symlinked `.aprx`, resolving its
+  relative paths from the link's target (it created
+  `C:\Users\hmatc\6_Pro_Default_Files`).
 - **Constraint:** standard library + ArcGIS Pro's `arcgispro-py3` env only
   (an organisational rule). No pip/conda packages in the script. If a task
   has an easier solution outside this (e.g. geopandas), **ask the user
@@ -98,24 +89,22 @@ the folder is unzipped there and the symlinks are made by hand.
 
 ## Running and testing
 
-`tools/run_notebook.py` runs the notebook's code cells in order as a plain
-script, so the questions (projections, layout, admin label language) can be
-answered on stdin. For the standard test, pipe in the answers (UTM 19N,
-location map = same, layout 3 = `landscape_a3_marginalia_inside`, admin
-labels from `ADM1_ES` / `ADM2_ES`):
+The questions (projections, layout, admin label language) are answered on
+stdin. For the standard test, pipe in the answers (UTM 19N, location map =
+same, layout 3 = `landscape_a3_marginalia_inside`, admin labels from
+`ADM1_ES` / `ADM2_ES`):
 
 ```
-Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
-"2", "19N", "0", "3", "ES" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" ..\..\..\..\..\..\tools\run_notebook.py
+Set-Location cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
+"2", "19N", "0", "3", "ES" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
 ```
 
 - PowerShell piping adds a BOM; `ask()` strips it. Piping from Git Bash into
   `propy.bat` has quoting problems, so use PowerShell.
-- The project is found by walking up from the working directory (in
-  Pro, the user's home folder, so this finds nothing), then from the lib's
-  **unresolved** path (`Path(__file__).absolute()`, never `.resolve()`; in
-  Pro, `map_automation_pro.aprx`'s folder, see above). So run from the symlink
-  folder, or set `PROJECT_FOLDER` in the notebook's first code cell.
+- The project is found by walking up from the script's **unresolved**
+  path (`SCRIPT_DIR = Path(__file__).absolute()`, never `.resolve()`), then
+  from the working directory, unless `--project` is given. So run the
+  symlink inside the example project, not the repo root's file.
 - arcpy needs ArcGIS Pro signed in. "The Product License has not been
   initialized" means the user must sign in to Pro; ask them.
 - MA901 takes about 35 seconds. `TEST_MODE` deletes MA* outputs first, so each
@@ -129,8 +118,8 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
 
 ## How the script works
 
-- **Project root:** the first folder above the working directory (or the
-  lib, or `PROJECT_FOLDER`) that holds both `event_description.json` and `GIS/`. (`GIS/` itself holds a blank
+- **Project root:** the first folder above the script (or the working
+  directory, or `--project`) that holds both `event_description.json` and `GIS/`. (`GIS/` itself holds a blank
   `event_description.json`, which is skipped.)
 - **Folders:** from `cmf_description.json`, plus the `3121_arcpro` /
   `321_arcpro` subfolders from the config.
@@ -142,7 +131,9 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
   question shows the country's width/height ratio in the Main map projection)
   and the admin label language; clear the old outputs in test mode (stops
   with a message if a file is open in Pro); then build each map. Each of
-  these is one notebook cell (one run-step function in the lib).
+  these is one run-step function, called in turn by `main()`. Each map
+  prints a `progress()` line before each stage, flushed at once, so a stall
+  shows where it happened.
 - **Building a map:**
   1. `saveACopy` the template, then at once set its home folder (the
      project's own folder) and its default geodatabase and toolbox (the
@@ -209,20 +200,17 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
 
 ## Known gaps / open questions
 
-- The first run inside ArcGIS Pro (the live Venezuela project, which has a
-  plain copy of the script, with `TEST_MODE = False`, in
-  `GIS/7_Python/71_Jupyter/map_automation/`) failed with
-  `ModuleNotFoundError`, even with `map_automation_pro.aprx` open: the
-  kernel's working directory is the user's home folder and isn't on
-  `sys.path` (checked in Pro: the project's `homeFolder` was right).
-  Loading from `ArcGISProject("CURRENT").homeFolder` is the fix; still to
-  confirm in Pro, along with `input()` prompts working. The live copy
-  doesn't update itself: after a fix, the user copies the changed files
-  across (writes to live need the user's say-so each time).
-- At release, the standard CMF also has an older
-  `71_Jupyter/blank_template_for_running_Jupyter_automation.aprx` (same
-  idea, but cluttered and with Myanmar paths); ask the user whether
-  `map_automation_pro.aprx` replaces it.
+- The script hasn't been run in the live project yet. The live project
+  still has the old notebook version (with `TEST_MODE = False` in its
+  config) in `GIS/7_Python/71_Jupyter/map_automation/`, plus two
+  half-built attempts, `MA901-v14` and `v15`, in `33_Map_Projects/MA901`
+  and `34_Map_Products_MapAction/MA901`. Writing to live (e.g. copying the
+  script into `72_Scripts/map_automation/`, or removing those) needs the
+  user's say-so each time; the live copy doesn't update itself.
+- The standard CMF has no `72_Scripts` folder yet (only `71_Jupyter`); at
+  release, it needs adding (the live project has one). The standard CMF's
+  `71_Jupyter/blank_template_for_running_Jupyter_automation.aprx` belonged
+  to the old notebook; ask the user whether it should go.
 
 - MA002 to MA004 are configured but untested by request.
 - The `PREFERRED_DATASETS` choices were picked by Claude for testing; confirm

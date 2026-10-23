@@ -1,7 +1,8 @@
 # MapAction map automation for ArcGIS Pro
 
-A Jupyter notebook, run inside ArcGIS Pro, that builds MapAction map products
-automatically. No Python knowledge is needed to run it. For each map it:
+A Python script, run with ArcGIS Pro's Python, that builds MapAction map
+products automatically. No Python knowledge is needed to run it: it asks a
+few questions, then does the rest. For each map it:
 
 1. creates an ArcGIS Pro project (`.aprx`) from a template and the chosen
    layout (`.pagx`), using the CMF's default geodatabase and toolbox,
@@ -22,7 +23,9 @@ automatically. No Python knowledge is needed to run it. For each map it:
    the same view as on the layout.
 
 This repository is where it is developed and tested. It replaces the
-Jupyter notebook `MapAction_Map_Automation_ArcPro_v29.ipynb`.
+Jupyter notebook `MapAction_Map_Automation_ArcPro_v29.ipynb`. (For a while
+it was a notebook again, run inside ArcGIS Pro; that was dropped because
+arcpy hangs there while building the maps. See "Running the script".)
 
 ## How this repository relates to the Crash Move Folders
 
@@ -50,17 +53,12 @@ repository or to Venezuela.
 ## What is in this repository
 
 ```
-map_automation_pro.aprx        empty ArcGIS Pro project, opened before the
-                               notebook (see "Running the notebook")
-map_automation_pro.ipynb       the notebook users run, step by step
-map_automation_pro_lib.py      the functions behind the notebook
+map_automation_pro.py          the script users run
 map_automation_pro_config.py   settings: which maps, layers, testing mode...
 README.md, CLAUDE.md           this guide, and notes for Claude Code sessions
-tools/                         runs the notebook from the command line for
-                               testing; makes map_automation_pro.aprx; zips
-                               an example project for Google Drive; refreshes
-                               the test data from the live project; tidies
-                               the test copy's map template
+tools/                         zips an example project for Google Drive;
+                               refreshes the test data from the live project;
+                               tidies the test copy's map template
 cmf_examples/README.txt        download links and setup steps for the
                                example projects (not stored in git, see below)
 ```
@@ -87,14 +85,13 @@ cmf_examples/2026-ven-001/     test copy of the Venezuela project (see below)
                                script's outputs go in 33_ and 34_
   GIS/6_Pro_Default_Files/     empty default geodatabase and toolbox, copied
                                from the standard CMF; every new project uses them
-  GIS/7_Python/71_Jupyter/map_automation/
-                               links (symlinks) to the three script files, and
-                               a real copy of map_automation_pro.aprx
+  GIS/7_Python/72_Scripts/map_automation/
+                               links (symlinks) to the two script files
 ```
 
-The script files are at the top of the repository, so the same notebook can
+The script files are at the top of the repository, so the same script can
 be tested against several example projects. Each example project gets
-symlinks to them in `GIS/7_Python/71_Jupyter/map_automation/`, so it always
+symlinks to them in `GIS/7_Python/72_Scripts/map_automation/`, so it always
 runs the current version. On Windows, creating symlinks needs **Developer
 Mode** (Settings › System › For developers); create them with `mklink`
 (the commands are in `cmf_examples/README.txt`).
@@ -169,40 +166,36 @@ each pulled 5 points further from the border, so the fade builds up gradually
 and is almost white about 35 mm from the border. The numbers are
 `FEATHER_STEPS`, `FEATHER_STEP_PT` and `FEATHER_STEP_OPACITY` in the config.
 
-## Running the notebook
+## Running the script
 
-In ArcGIS Pro (signed in):
-
-1. Open the project
-   `GIS/7_Python/71_Jupyter/map_automation/map_automation_pro.aprx`. It is
-   empty: it is only there so the notebook runs in the right folder.
-2. In its Catalog pane, open **Folders > map_automation >
-   map_automation_pro.ipynb**.
-3. Run the cells from the top, one at a time (Ctrl+Enter) or with **Run All
-   Cells**. Each step has a short explanation above it.
-
-ArcGIS Pro runs every notebook from the user's home folder (e.g.
-`C:\Users\<name>`), not from the notebook's own folder, so the notebook
-can't find its files by itself. Its first cell instead loads them from the
-open project's home folder, which for `map_automation_pro.aprx` is the
-notebook's folder. From there it also finds the project it sits in. If
-another project is open, the first cell stops with a message saying so.
-To build maps for a different project, set `PROJECT_FOLDER` in the first
-code cell.
-
-`map_automation_pro.aprx` is made by `tools/make_notebook_project.py` (run
-with `propy.bat`) from the test copy's map template, with the maps and
-layouts removed. Its paths are relative (default geodatabase and toolbox in
-`GIS/6_Pro_Default_Files`, home folder its own folder), so the same file
-works in any CMF. It must be a real copy, never a symlink: ArcGIS Pro
-follows a link and works the paths out from where the real file is.
-
-For testing, the notebook can also be run from the command line, with the
-answers to its questions piped in (PowerShell):
+The script is in the project's `GIS/7_Python/72_Scripts/map_automation/`
+folder, with its settings file. ArcGIS Pro must be installed and signed in.
+Open a Command Prompt, go to that folder and run the script with ArcGIS
+Pro's Python (`propy.bat`), e.g.:
 
 ```
-cd cmf_examples\2026-ven-001\GIS\7_Python\71_Jupyter\map_automation
-"2", "19N", "0", "3", "ES" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" ..\..\..\..\..\..\tools\run_notebook.py
+cd /d C:\...\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
+"C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
+```
+
+(In PowerShell, put `&` before the quoted `propy.bat` path.) The script
+finds the project it sits in. To build maps for another project, add
+`--project <any folder inside that project>`.
+
+It prints what it is doing as it goes, including a line before each stage
+of each map, and lists the project and JPEG of each map at the end. ArcGIS
+Pro can stay open, but close any of the script's earlier outputs in it.
+
+**Don't run it inside ArcGIS Pro** (its Python window or a notebook).
+There, arcpy hangs while it edits the new projects (it stopped at
+removing the template's maps, with no error), so the script must run in a
+separate Python, as above. This is also why it isn't a notebook any more.
+
+For testing, pipe in the answers to its questions (PowerShell):
+
+```
+Set-Location cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
+"2", "19N", "0", "3", "ES" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
 ```
 
 It asks four questions:
@@ -275,11 +268,10 @@ donor credit, JPEG resolution) come from the project's
 ## Current state
 
 - **MA901** builds cleanly from the test data (about 40 seconds).
-- The notebook has been tested from the command line
-  (`tools/run_notebook.py`). The first tries inside ArcGIS Pro (in the live
-  Venezuela project) failed because Pro runs notebooks from the user's
-  home folder; loading the files from `map_automation_pro.aprx`'s folder is
-  the fix, not yet tried in Pro.
+- The script has only been run in the test copy so far. A run as a
+  notebook inside ArcGIS Pro (in the live Venezuela project and the test
+  copy) hung while building the first map, which is why it is a script
+  again.
 - The feather, default geodatabase and toolbox, project tidying and opening
   tabs are new; the tabs and tidying are checked with arcpy but not yet
   confirmed by opening the project in ArcGIS Pro.
