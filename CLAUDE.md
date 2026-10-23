@@ -201,13 +201,12 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
 
 ## Known gaps / open questions
 
-- The script hasn't been run in the live project yet. The live project
-  still has the old notebook version (with `TEST_MODE = False` in its
-  config) in `GIS/7_Python/71_Jupyter/map_automation/`, plus two
-  half-built attempts, `MA901-v14` and `v15`, in `33_Map_Projects/MA901`
-  and `34_Map_Products_MapAction/MA901`. Writing to live (e.g. copying the
-  script into `GIS/7_Python/map_automation/`, or removing those) needs the
-  user's say-so each time; the live copy doesn't update itself.
+- The live project has a plain copy of the script and config (with
+  `TEST_MODE = False`) in `GIS/7_Python/map_automation/`, copied on
+  23 Oct 2026, not yet run there. The old notebook folder and the
+  half-built `MA901-v14`/`v15` from the notebook tries were deleted (at
+  the user's request), so its next MA901 is `v14`. Writing to live needs
+  the user's say-so each time; the live copy doesn't update itself.
 - At release, the script goes in the standard CMF's
   `20YYiso3nn/GIS/7_Python/map_automation/` (a new folder; `7_Python`
   itself exists). The standard CMF's
