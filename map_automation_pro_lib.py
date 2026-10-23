@@ -627,6 +627,12 @@ def set_label_language(layer, language, admin_language):
             label_class.expression = new_expression
 
 
+def progress(text):
+    """One line of progress while a map is built, shown at once (so a stall
+    shows where it happened)."""
+    print(f"  {text}...", flush=True)
+
+
 def save_with_retry(aprx, attempts=5, delay=1.5):
     """Save, retrying while a sync client (e.g. Nextcloud) briefly locks the file."""
     for attempt in range(1, attempts + 1):
@@ -814,18 +820,23 @@ def create_project(template, pagx, target, paths):
     Location map). saveACopy gives the copy new internal IDs, so it stays
     independent of the template even if that is open in ArcGIS Pro."""
     target.parent.mkdir(parents=True, exist_ok=True)
+    progress(f"copying the template {template.name}")
     template_project = arcpy.mp.ArcGISProject(str(template))
     template_project.saveACopy(str(target))
     del template_project
     target.chmod(stat.S_IWRITE | stat.S_IREAD)  # templates are often read-only
 
+    progress("opening the copy and setting its default geodatabase and toolbox")
     aprx = arcpy.mp.ArcGISProject(str(target))
     set_project_defaults(aprx, target, paths)  # first, so nothing is written to the template's old folders
+    progress("removing the template's maps and layouts")
     for layout in aprx.listLayouts():
         aprx.deleteItem(layout)
     for map_obj in aprx.listMaps():
         aprx.deleteItem(map_obj)
+    progress(f"importing the layout {pagx.name}")
     aprx.importDocument(str(pagx))
+    progress("saving the project")
     save_with_retry(aprx)
     del aprx
 
@@ -1177,6 +1188,7 @@ def build_map(map_spec, resolved, event, choices, paths):
     create_project(choices.template, choices.layout, project_file, paths)
 
     # 1. Add the layers, save, and close the project.
+    progress("adding the layers")
     aprx = arcpy.mp.ArcGISProject(str(project_file))
     sources = add_map_layers(aprx, map_spec, resolved, paths)
     save_with_retry(aprx)
@@ -1184,15 +1196,18 @@ def build_map(map_spec, resolved, event, choices, paths):
     gc.collect()  # releases arcpy's file lock on the .aprx
 
     # 2. Reopen, then finish the maps, zoom, legend, styling, text, export.
+    progress("setting projections, labels and filters")
     aprx = arcpy.mp.ArcGISProject(str(project_file))
     finish_maps(aprx, map_spec, resolved, event, choices)
     layout = aprx.listLayouts()[0]
     zoom_frames(aprx, layout)
     fit_scale_bar(layout)
+    progress("filling in the legend, styling and text")
     fill_legend(layout, aprx.listMaps(MAIN)[0])
     style_layout(layout)
     update_text(layout, map_spec, version, event, choices.country, sources, choices.main_projection)
     save_with_retry(aprx)
+    progress("exporting the JPEG")
     layout.exportToJPEG(str(jpeg_file), resolution=event.jpeg_dpi)
     cameras = frame_cameras(layout)
     layout_name, page = layout.name, (layout.pageWidth, layout.pageHeight)
@@ -1200,6 +1215,7 @@ def build_map(map_spec, resolved, event, choices, paths):
     gc.collect()
 
     # 3. Remove the template's clutter; open the maps and layout as tabs.
+    progress("tidying the project")
     try:
         removed = finish_project_file(project_file, cameras, layout_name, page, paths)
         print(f"  removed {removed} leftover project items inherited from the template")

@@ -6,7 +6,8 @@ README.md first for the user-facing picture.
 ## Key facts
 
 - **Files:** at the repo root. Each example project links to them with
-  **symlinks** in `cmf_examples/<project>/GIS/7_Python/71_Jupyter/map_automation/`.
+  **symlinks** in `cmf_examples/<project>/GIS/7_Python/71_Jupyter/map_automation/`
+  (except `map_automation_pro.aprx`, which is copied; see below).
   Edit the root files only.
   - `map_automation_pro.ipynb`: what users run, in ArcGIS Pro. Aimed at
     non-Python users: a markdown cell before each code cell, and each code
@@ -25,8 +26,12 @@ README.md first for the user-facing picture.
     `"CURRENT"` raises `OSError` and it uses the working directory. Made by `tools/make_notebook_project.py` (run with
     `propy.bat`) from the test copy's template; paths relative to
     `GIS/7_Python/71_Jupyter/map_automation`, no stored `homeFolder`.
-    Rebuild it rather than editing it. If Pro saved it through the symlink
-    (e.g. adding a notebook item), `git restore` it.
+    Rebuild it rather than editing it; the tool writes both the repo root's
+    copy and the test copy's. **The test copy's is a real file, not a
+    symlink:** ArcGIS Pro (unlike arcpy) follows the link and resolves the
+    relative paths and home folder from the repo root. With a link, Pro
+    created `C:\Users\hmatc\6_Pro_Default_Files` and a
+    `RasterFunctionTemplates` folder in the repo root.
   - `cmf_examples/`: example projects, downloaded from Google Drive and not
     tracked by git (see "The test copy").
 - **Constraint:** standard library + ArcGIS Pro's `arcgispro-py3` env only

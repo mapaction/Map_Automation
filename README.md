@@ -88,7 +88,8 @@ cmf_examples/2026-ven-001/     test copy of the Venezuela project (see below)
   GIS/6_Pro_Default_Files/     empty default geodatabase and toolbox, copied
                                from the standard CMF; every new project uses them
   GIS/7_Python/71_Jupyter/map_automation/
-                               links (symlinks) to the four script files
+                               links (symlinks) to the three script files, and
+                               a real copy of map_automation_pro.aprx
 ```
 
 The script files are at the top of the repository, so the same notebook can
@@ -193,7 +194,8 @@ code cell.
 with `propy.bat`) from the test copy's map template, with the maps and
 layouts removed. Its paths are relative (default geodatabase and toolbox in
 `GIS/6_Pro_Default_Files`, home folder its own folder), so the same file
-works in any CMF.
+works in any CMF. It must be a real copy, never a symlink: ArcGIS Pro
+follows a link and works the paths out from where the real file is.
 
 For testing, the notebook can also be run from the command line, with the
 answers to its questions piped in (PowerShell):

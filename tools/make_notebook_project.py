@@ -15,8 +15,10 @@ GIS/7_Python/71_Jupyter/map_automation, so the file works in any CMF:
 - home folder: not stored, so ArcGIS Pro uses the .aprx's own folder.
 
 It is built in the test copy's map_automation folder (so the relative paths
-are right) and then moved to the repository root, next to the notebook.
-Symlink it into each example project like the other script files (see
+are right), saved there as map_automation_pro.aprx, and copied to the
+repository root (the version that is committed and released). The test
+copy's must be a real copy, not a symlink: ArcGIS Pro follows a link and
+would work out the relative paths from the repository root (see
 cmf_examples/README.txt). Close it in ArcGIS Pro first.
 
 Usage (ArcGIS Pro's Python, since it uses arcpy and map_automation_pro_lib.py):
@@ -26,6 +28,7 @@ Usage (ArcGIS Pro's Python, since it uses arcpy and map_automation_pro_lib.py):
 import argparse
 import gc
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -75,8 +78,12 @@ def main():
         return [(i.get("itemType"), i.get("catalogPath")) for i in project["projectItems"]]
 
     items = automation.edit_project_json(built, edit)
-    os.replace(built, final)
-    print(f"{final}: {len(items)} project items")
+    in_example = folder / NAME
+    if in_example.is_symlink():
+        in_example.unlink()
+    os.replace(built, in_example)
+    shutil.copy2(in_example, final)
+    print(f"{final} (and {in_example}): {len(items)} project items")
     for kind, path in items:
         print(f"  {kind:18} {path}")
 
