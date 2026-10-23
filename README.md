@@ -55,6 +55,7 @@ repository or to Venezuela.
 ```
 map_automation_pro.py          the script users run
 map_automation_pro_config.py   settings: which maps, layers, testing mode...
+run_map_automation.bat         double-click to run the script
 README.md, CLAUDE.md           this guide, and notes for Claude Code sessions
 tools/                         zips an example project for Google Drive;
                                refreshes the test data from the live project;
@@ -86,7 +87,7 @@ cmf_examples/2026-ven-001/     test copy of the Venezuela project (see below)
   GIS/6_Pro_Default_Files/     empty default geodatabase and toolbox, copied
                                from the standard CMF; every new project uses them
   GIS/7_Python/map_automation/
-                               links (symlinks) to the two script files
+                               links (symlinks) to the three script files
 ```
 
 The script files are at the top of the repository, so the same script can
@@ -170,7 +171,14 @@ and is almost white about 35 mm from the border. The numbers are
 
 The script is in the project's `GIS/7_Python/map_automation/`
 folder, with its settings file. ArcGIS Pro must be installed and signed in.
-Open a Command Prompt, go to that folder and run the script with ArcGIS
+
+**The easy way:** double-click `run_map_automation.bat` in that folder (in
+File Explorer). A window opens; answer the questions there, pressing Enter
+after each one. The window stays open at the end so the results can be
+read. The `.bat` finds ArcGIS Pro's Python itself (from the registry, or
+`C:\Program Files\ArcGIS\Pro`) and says so if ArcGIS Pro isn't installed.
+
+**From a Command Prompt:** go to that folder and run the script with ArcGIS
 Pro's Python (`propy.bat`), e.g.:
 
 ```

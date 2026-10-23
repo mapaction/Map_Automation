@@ -4,3 +4,4 @@
 *.json -text
 *.ipynb -text
 *.pagx -text
+*.bat text eol=crlf

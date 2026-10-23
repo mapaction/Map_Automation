@@ -14,6 +14,13 @@ README.md first for the user-facing picture.
     `check_before_building`, `clear_old_outputs`, `build_maps`). Users are
     not Python users: keep the printed messages plain.
   - `map_automation_pro_config.py`: settings.
+  - `run_map_automation.bat`: double-click launcher for non-Python users.
+    Finds Pro's `InstallDir` in the registry (HKLM, then HKCU; default
+    `C:\Program Files\ArcGIS\Pro\`), runs the script from `%~dp0` (the
+    link's folder, not the target's, so a symlinked `.bat` finds the
+    example project) and pauses at the end. CRLF line endings
+    (`.gitattributes`). Write it with the Write tool, not Git Bash, which
+    rewrites `nul` as `/dev/null`. Test: pipe answers into `cmd /c` the `.bat`.
   - `cmf_examples/`: example projects, downloaded from Google Drive and not
     tracked by git (see "The test copy").
 - **Not a notebook, and never run inside ArcGIS Pro.** In Oct 2026 it was a
@@ -201,9 +208,9 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
 
 ## Known gaps / open questions
 
-- The live project has a plain copy of the script and config (with
-  `TEST_MODE = False`) in `GIS/7_Python/map_automation/`, copied on
-  23 Oct 2026, not yet run there. The old notebook folder and the
+- The live project has a plain copy of the script, config (with
+  `TEST_MODE = False`) and `.bat` in `GIS/7_Python/map_automation/`,
+  copied on 23 Oct 2026, not yet run there. The old notebook folder and the
   half-built `MA901-v14`/`v15` from the notebook tries were deleted (at
   the user's request), so its next MA901 is `v14`. Writing to live needs
   the user's say-so each time; the live copy doesn't update itself.
