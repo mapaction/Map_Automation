@@ -5,7 +5,7 @@ layout (.pagx), layer files (.lyrx) and the data in 2_Active_Data, using the
 standard MapAction project folder structure.
 
 Run it with ArcGIS Pro's Python, from the project's
-GIS/7_Python/72_Scripts/map_automation folder (ArcGIS Pro installed and
+GIS/7_Python/map_automation folder (ArcGIS Pro installed and
 signed in):
 
     "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py

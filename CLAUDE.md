@@ -6,7 +6,7 @@ README.md first for the user-facing picture.
 ## Key facts
 
 - **Files:** at the repo root. Each example project links to them with
-  **symlinks** in `cmf_examples/<project>/GIS/7_Python/72_Scripts/map_automation/`.
+  **symlinks** in `cmf_examples/<project>/GIS/7_Python/map_automation/`.
   Edit the root files only.
   - `map_automation_pro.py`: the script users run with `propy.bat`, from
     that folder. All the functions; `main()` at the end calls the run steps
@@ -20,7 +20,8 @@ README.md first for the user-facing picture.
   Jupyter notebook in `71_Jupyter` for a while. Inside Pro,
   `aprx.deleteItem` on the new (not the open) project hung with no error,
   in both the live and test projects; the same code runs fine from
-  `propy.bat`. The user then chose a script in `72_Scripts`. Also found
+  `propy.bat`. The user then chose a script, directly in `7_Python` (not
+  `72_Scripts`, which the standard CMF lacks). Also found
   then: a Pro notebook's working directory is the user's home folder and
   isn't on `sys.path`; and Pro follows a symlinked `.aprx`, resolving its
   relative paths from the link's target (it created
@@ -95,7 +96,7 @@ same, layout 3 = `landscape_a3_marginalia_inside`, admin labels from
 `ADM1_ES` / `ADM2_ES`):
 
 ```
-Set-Location cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
+Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
 "2", "19N", "0", "3", "ES" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
 ```
 
@@ -205,10 +206,11 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
   config) in `GIS/7_Python/71_Jupyter/map_automation/`, plus two
   half-built attempts, `MA901-v14` and `v15`, in `33_Map_Projects/MA901`
   and `34_Map_Products_MapAction/MA901`. Writing to live (e.g. copying the
-  script into `72_Scripts/map_automation/`, or removing those) needs the
+  script into `GIS/7_Python/map_automation/`, or removing those) needs the
   user's say-so each time; the live copy doesn't update itself.
-- The standard CMF has no `72_Scripts` folder yet (only `71_Jupyter`); at
-  release, it needs adding (the live project has one). The standard CMF's
+- At release, the script goes in the standard CMF's
+  `20YYiso3nn/GIS/7_Python/map_automation/` (a new folder; `7_Python`
+  itself exists). The standard CMF's
   `71_Jupyter/blank_template_for_running_Jupyter_automation.aprx` belonged
   to the old notebook; ask the user whether it should go.
 

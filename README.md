@@ -85,13 +85,13 @@ cmf_examples/2026-ven-001/     test copy of the Venezuela project (see below)
                                script's outputs go in 33_ and 34_
   GIS/6_Pro_Default_Files/     empty default geodatabase and toolbox, copied
                                from the standard CMF; every new project uses them
-  GIS/7_Python/72_Scripts/map_automation/
+  GIS/7_Python/map_automation/
                                links (symlinks) to the two script files
 ```
 
 The script files are at the top of the repository, so the same script can
 be tested against several example projects. Each example project gets
-symlinks to them in `GIS/7_Python/72_Scripts/map_automation/`, so it always
+symlinks to them in `GIS/7_Python/map_automation/`, so it always
 runs the current version. On Windows, creating symlinks needs **Developer
 Mode** (Settings › System › For developers); create them with `mklink`
 (the commands are in `cmf_examples/README.txt`).
@@ -168,13 +168,13 @@ and is almost white about 35 mm from the border. The numbers are
 
 ## Running the script
 
-The script is in the project's `GIS/7_Python/72_Scripts/map_automation/`
+The script is in the project's `GIS/7_Python/map_automation/`
 folder, with its settings file. ArcGIS Pro must be installed and signed in.
 Open a Command Prompt, go to that folder and run the script with ArcGIS
 Pro's Python (`propy.bat`), e.g.:
 
 ```
-cd /d C:\...\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
+cd /d C:\...\2026-ven-001\GIS\7_Python\map_automation
 "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
 ```
 
@@ -194,7 +194,7 @@ separate Python, as above. This is also why it isn't a notebook any more.
 For testing, pipe in the answers to its questions (PowerShell):
 
 ```
-Set-Location cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
+Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
 "2", "19N", "0", "3", "ES" | & "C:\Program Files\ArcGIS\Pro\bin\Python\Scripts\propy.bat" map_automation_pro.py
 ```
 

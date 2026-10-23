@@ -46,13 +46,12 @@ It should look like this (only the main folders are shown):
               34_Map_Products_MapAction\ (empty: the script's JPEG outputs)
             6_Pro_Default_Files\
             7_Python\
-              72_Scripts\
-                map_automation\          (empty until step 3)
+              map_automation\            (empty until step 3)
 
 event_description.json and the GIS folder must be directly inside
 2026-ven-001, not one level further down. (Older zips have an empty
-7_Python\71_Jupyter\map_automation folder instead of 72_Scripts; step 3
-creates the new folder, and the old one can be deleted.)
+7_Python\71_Jupyter\map_automation folder instead; step 3 creates the new
+folder, and the old map_automation folder can be deleted.)
 
 
 3) Set up the symlinks
@@ -60,7 +59,7 @@ creates the new folder, and the old one can be deleted.)
 
 The script and its settings file live at the top of the repository. Each
 example project needs links (symlinks) to them in its
-GIS\7_Python\72_Scripts\map_automation folder, so it always runs the
+GIS\7_Python\map_automation folder, so it always runs the
 current version.
 
 Creating symlinks on Windows needs Developer Mode turned on:
@@ -68,10 +67,10 @@ Settings > System > For developers > Developer Mode.
 
 Then, in PowerShell, from the repository folder (Map_Automation):
 
-    New-Item -ItemType Directory -Force cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
-    Set-Location cmf_examples\2026-ven-001\GIS\7_Python\72_Scripts\map_automation
-    cmd /c mklink map_automation_pro.py ..\..\..\..\..\..\map_automation_pro.py
-    cmd /c mklink map_automation_pro_config.py ..\..\..\..\..\..\map_automation_pro_config.py
+    New-Item -ItemType Directory -Force cmf_examples\2026-ven-001\GIS\7_Python\map_automation
+    Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
+    cmd /c mklink map_automation_pro.py ..\..\..\..\..\map_automation_pro.py
+    cmd /c mklink map_automation_pro_config.py ..\..\..\..\..\map_automation_pro_config.py
     Get-ChildItem
 
 (The two mklink lines work in a Command Prompt too, without "cmd /c".
