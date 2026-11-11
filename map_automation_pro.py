@@ -21,10 +21,11 @@ project folder.
 Don't run it inside ArcGIS Pro (its Python window or a notebook): there,
 arcpy hangs while editing the new projects.
 
-Only the standard library and arcpy are used.
+Only the standard library, arcpy and Pillow (both part of ArcGIS Pro's Python) are used.
 """
 
 import argparse
+import csv
 import gc
 import json
 import math
@@ -78,6 +79,8 @@ class ProjectPaths:
     map_projects: Path
     map_exports: Path
     pro_defaults: Path   # 6_Pro_Default_Files (default geodatabase and toolbox)
+    data_naming: Path    # data_naming_convention.json in 200_data_name_lookup
+    logos: Path          # 315_Logos
 
     @classmethod
     def from_root(cls, root):
@@ -90,15 +93,18 @@ class ProjectPaths:
         def folder(key, default):
             return root / cmf.get(key, default)
 
+        layer_rendering = folder("layer_rendering", "GIS/3_Mapping/31_Resources/312_Layer_files")
         return cls(
             root=root,
             active_data=folder("active_data", "GIS/2_Active_Data"),
-            layer_files=folder("layer_rendering", "GIS/3_Mapping/31_Resources/312_Layer_files")
-            / cfg.LAYER_FILES_SUBFOLDER,
+            layer_files=layer_rendering / cfg.LAYER_FILES_SUBFOLDER,
             templates=folder("map_templates", "GIS/3_Mapping/32_Map_Templates") / cfg.TEMPLATES_SUBFOLDER,
             map_projects=folder("map_projects", "GIS/3_Mapping/33_Map_Projects"),
             map_exports=folder("export_dir", "GIS/3_Mapping/34_Map_Products_MapAction"),
             pro_defaults=root / cfg.PRO_DEFAULT_FILES_FOLDER,
+            data_naming=folder("data_nc_definition",
+                               "GIS/2_Active_Data/200_data_name_lookup/data_naming_convention.json"),
+            logos=layer_rendering.parent / cfg.LOGOS_SUBFOLDER,
         )
 
     def default_geodatabase(self):
@@ -106,6 +112,17 @@ class ProjectPaths:
 
     def default_toolbox(self):
         return self.pro_defaults / cfg.DEFAULT_TOOLBOX
+
+    def source_lookup_file(self):
+        """The data naming convention's list of data sources (06_source.csv),
+        as named in data_naming_convention.json."""
+        filename = "06_source.csv"
+        try:
+            clauses = json.loads(self.data_naming.read_text(encoding="utf-8-sig"))["clauses"]
+            filename = next(c["filename"] for c in clauses if c.get("name") == "source")
+        except (OSError, ValueError, KeyError, TypeError, StopIteration):
+            pass
+        return self.data_naming.parent / filename
 
     def data_scramble_sheet_url(self):
         """Link from the '... Data Scramble Sheet.url' shortcut in the project root, if any."""
@@ -128,6 +145,7 @@ class Event:
     disclaimer: str
     donor_credits: str
     jpeg_dpi: int
+    donors: tuple      # donor names, for their logos
 
     @classmethod
     def from_json(cls, path):
@@ -148,6 +166,7 @@ class Event:
             disclaimer=data.get("default_disclaimer_text", ""),
             donor_credits=data.get("default_donor_credits", ""),
             jpeg_dpi=int(data.get("default_jpeg_res_dpi") or 300),
+            donors=tuple(d.strip() for d in data.get("donors") or [] if d and d.strip()),
         )
 
 
@@ -477,12 +496,30 @@ def style_feather(layer):
     layer.setDefinition(definition)
 
 
-def source_display_names(sources):
-    """Marginalia names for data sources ('naturalearth' -> 'Natural Earth')."""
-    missing = sorted(s for s in sources if s not in cfg.SOURCE_NAMES)
+def source_lookup(paths):
+    """{source code: name} from the project's 06_source.csv (Value and
+    Description columns), or {} if it can't be read."""
+    file = paths.source_lookup_file()
+    try:
+        with open(file, encoding="utf-8-sig", newline="") as handle:
+            return {row["Value"].strip().lower(): row["Description"].strip()
+                    for row in csv.DictReader(handle)
+                    if (row.get("Value") or "").strip() and (row.get("Description") or "").strip()}
+    except (OSError, KeyError, csv.Error, UnicodeDecodeError) as error:
+        print(f"  * could not read the data source names in {file.name} ({error}); "
+              "using SOURCE_NAMES from the config")
+        return {}
+
+
+def source_display_names(sources, paths):
+    """Marginalia names for data sources ('ourairports' -> 'Our Airports'):
+    from the project's 06_source.csv, else SOURCE_NAMES in the config."""
+    names = {**cfg.SOURCE_NAMES, **source_lookup(paths)}
+    missing = sorted(s for s in sources if s not in names)
     if missing:
-        print(f"  * no SOURCE_NAMES entry for: {', '.join(missing)} (shown as they are)")
-    return sorted(cfg.SOURCE_NAMES.get(s, s) for s in sources)
+        print(f"  * no name for these data sources in 06_source.csv or SOURCE_NAMES: "
+              f"{', '.join(missing)} (shown as they are)")
+    return sorted(names.get(s, s) for s in sources)
 
 
 # =============================================================================
@@ -789,7 +826,7 @@ def scale_text(layout):
     return text
 
 
-def update_text(layout, map_spec, version, event, country, sources, main_projection, map_name):
+def update_text(layout, map_spec, version, event, country, sources, main_projection, map_name, paths):
     """Fill in the layout's text elements. map_name is the project's file
     name without the extension, e.g. MA901-v01-country-overview-..."""
     texts = {
@@ -802,7 +839,7 @@ def update_text(layout, map_spec, version, event, country, sources, main_project
         "glide_no": event.glide,
         "time_zone": event.time_zone,
         "create_date_time": time.strftime("%d %b %Y / %H:%M"),
-        "data_sources": ", ".join(source_display_names(sources)),
+        "data_sources": ", ".join(source_display_names(sources, paths)),
         "map_producer": event.producer,
         "disclaimer": event.disclaimer,
         "donor_credit": event.donor_credits,
@@ -810,7 +847,153 @@ def update_text(layout, map_spec, version, event, country, sources, main_project
     }
     for element in layout.listElements("TEXT_ELEMENT"):
         if texts.get(element.name):
+            was_off_page = element_right_edge(element) <= 0
             element.text = texts[element.name]
+            if was_off_page:
+                keep_off_page(element)
+
+
+def anchor_fraction(element):
+    """How far across its own width an element's position (anchor) point
+    is: 0 on the left, 0.5 in the middle, 1 on the right."""
+    anchor = element.getDefinition("V3").anchor or ""
+    return 0 if "Left" in anchor else 1 if "Right" in anchor else 0.5
+
+
+def element_right_edge(element):
+    return element.elementPositionX + (1 - anchor_fraction(element)) * element.elementWidth
+
+
+def keep_off_page(element, margin_mm=2):
+    """Move an off-page element (left of the page) further left if its new
+    text has made it reach onto the page. These elements hold metadata for
+    MapAction's map export tool and must not show on the map."""
+    overlap = element_right_edge(element) + margin_mm
+    if overlap > 0:
+        element.elementPositionX -= overlap
+
+
+# =============================================================================
+# Donor logos
+# =============================================================================
+
+# Picture types ArcGIS Pro can show, best first (.eps, .svg, .pdf are skipped).
+LOGO_PICTURE_RANK = {".png": 0, ".jpg": 1, ".jpeg": 1, ".gif": 2, ".bmp": 3, ".tif": 4, ".tiff": 4}
+
+
+def name_key(text):
+    """Donor or folder name for matching: lower case, letters and digits
+    only, without a leading 'the' ('the German Federal Foreign Office' ->
+    'germanfederalforeignoffice')."""
+    text = re.sub(r"^the\s+", "", text.strip(), flags=re.IGNORECASE)
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def best_picture(folder):
+    """The logo picture to use from a folder: .png first, then .jpg ...,
+    RGB rather than CMYK or grey, nearest the top of the folder."""
+    def rank(picture):
+        text = str(picture.relative_to(folder)).lower()
+        return (LOGO_PICTURE_RANK[picture.suffix.lower()], "cmyk" in text or "grau" in text,
+                len(picture.parts), text)
+    pictures = [p for p in folder.rglob("*") if p.suffix.lower() in LOGO_PICTURE_RANK and p.is_file()]
+    return min(pictures, key=rank, default=None)
+
+
+def donor_logo(donor, paths):
+    """Logo file of a donor (see DONOR_LOGOS in the config), or None."""
+    configured = {name_key(name): target for name, target in cfg.DONOR_LOGOS.items()}
+    target = configured.get(name_key(donor))
+    if target:
+        candidate = paths.logos / target
+    elif paths.logos.is_dir():
+        candidate = next((f for f in paths.logos.iterdir()
+                          if f.is_dir() and name_key(f.name) == name_key(donor)), None)
+    else:
+        candidate = None
+    if candidate is None:
+        return None
+    if candidate.is_dir():
+        return best_picture(candidate)
+    return candidate if candidate.is_file() else None
+
+
+def picture_aspect(picture):
+    """Width / height of a picture, or None if it can't be read."""
+    try:
+        from PIL import Image  # part of ArcGIS Pro's Python
+        with Image.open(picture) as image:
+            width, height = image.size
+        return width / height
+    except Exception:
+        return None
+
+
+def logo_placeholders(layout):
+    """[(picture element, its group or None, CIM box dict, anchor)] for each
+    donor logo placeholder on the page (pictures off the page are spares)."""
+    group_of = {}
+    for group in layout.listElements("GROUP_ELEMENT"):
+        for member in group.elements:
+            group_of.setdefault(member.name, group)
+    found = []
+    for picture in layout.listElements("PICTURE_ELEMENT"):
+        if not Path(picture.sourceImage or "").stem.lower().startswith(cfg.LOGO_PLACEHOLDER_IMAGE.lower()):
+            continue
+        cim = picture.getDefinition("V3")
+        box = cim.graphic.box
+        box = box if isinstance(box, dict) else {k: getattr(box, k) for k in ("xmin", "ymin", "xmax", "ymax")}
+        on_page = (box["xmax"] > 0 and box["ymax"] > 0
+                   and box["xmin"] < layout.pageWidth and box["ymin"] < layout.pageHeight)
+        if on_page:
+            found.append((picture, group_of.get(picture.name), box, cim.anchor or ""))
+    return found
+
+
+def place_logos(aprx, container, box, anchor, logos, gap):
+    """Put the logos side by side, as large as fits in the box, aligned
+    within it as the placeholder was anchored (e.g. bottom right).
+    logos: [(donor, picture file)]."""
+    box_width, box_height = box["xmax"] - box["xmin"], box["ymax"] - box["ymin"]
+    aspects = [picture_aspect(picture) or box_width / box_height / len(logos) for _, picture in logos]
+    height = min(box_height, (box_width - gap * (len(logos) - 1)) / sum(aspects))
+    row_width = height * sum(aspects) + gap * (len(logos) - 1)
+    across = 0 if "Left" in anchor else 1 if "Right" in anchor else 0.5
+    up = 0 if anchor.startswith("Bottom") else 1 if anchor.startswith("Top") else 0.5
+    x = box["xmin"] + across * (box_width - row_width)
+    y = box["ymin"] + up * (box_height - height)
+    for (donor, picture), aspect in zip(logos, aspects):
+        width = height * aspect
+        corners = [(x, y), (x, y + height), (x + width, y + height), (x + width, y), (x, y)]
+        shape = arcpy.Polygon(arcpy.Array([arcpy.Point(*corner) for corner in corners]))
+        aprx.createPictureElement(container, shape, str(picture), f"Logo - {donor}", False)
+        x += width + gap
+
+
+def add_donor_logos(aprx, layout, event, paths):
+    """Replace the layout's donor logo placeholder with the logos of the
+    donors in event_description.json. With no donors, the placeholder is
+    removed; if a donor's logo can't be found, it is left as a reminder."""
+    placeholders = logo_placeholders(layout)
+    if not placeholders:
+        if event.donors:
+            print("  * this layout has no donor logo placeholder, so no donor logos")
+        return
+    logos = [(donor, donor_logo(donor, paths)) for donor in event.donors]
+    missing = [donor for donor, picture in logos if picture is None]
+    if missing:
+        print(f"  * no logo found for {', '.join(missing)}: the donor logo placeholder is left "
+              f"on the map. Add the logo to {paths.logos.name} or DONOR_LOGOS in the config.")
+        return
+    gap = cfg.LOGO_GAP_MM / MM_PER_PAGE_UNIT.get(layout.pageUnits, 1)
+    for picture, group, box, anchor in placeholders:
+        layout.deleteElement(picture)
+        if logos:
+            place_logos(aprx, group or layout, box, anchor, logos, gap)
+    if logos:
+        print(f"  donor logos: {', '.join(picture.name for _, picture in logos)}")
+    else:
+        print("  no donors in event_description.json, so the donor logo placeholder is removed")
 
 
 # =============================================================================
@@ -1240,7 +1423,8 @@ def build_map(map_spec, resolved, event, choices, paths):
     fill_legend(layout, aprx.listMaps(MAIN)[0])
     style_layout(layout)
     update_text(layout, map_spec, version, event, choices.country, sources, choices.main_projection,
-                base_name)
+                base_name, paths)
+    add_donor_logos(aprx, layout, event, paths)
     save_with_retry(aprx)
     progress("exporting the JPEG")
     layout.exportToJPEG(str(jpeg_file), resolution=event.jpeg_dpi)
@@ -1357,6 +1541,11 @@ def check_before_building(run, resolved, choices):
                  for path in (paths.default_geodatabase(), paths.default_toolbox()) if not path.exists()]
     warnings += [f"no data found for '{s.layer}' ({s.frame}): {s.prefix} {s.pattern} in {s.folder}"
                  for s in run.specs if s not in resolved]
+    warnings += [f"no logo found for the donor '{donor}' in {paths.logos} (add one there, or to "
+                 "DONOR_LOGOS in the config), so the donor logo placeholder stays on the map"
+                 for donor in run.event.donors if donor_logo(donor, paths) is None]
+    if not run.event.donors:
+        warnings.append("no donors listed in event_description.json, so the maps get no donor logo")
     if not warnings:
         print("No problems found.")
         return

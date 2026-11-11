@@ -24,7 +24,7 @@ MANIFEST = Path(__file__).resolve().parent / "test_data_manifest.txt"
 # Edited in the test copy (see README.md); never overwritten from the live project.
 LAYER_FILES = "GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/"
 LOCAL_CHANGES = {
-    "event_description.json",                         # switched to English
+    "event_description.json",                         # switched to English; donors listed
     LAYER_FILES + "admn_adx_py_all_reference.lyrx",   # Bird / Navassa Island labels hidden
     LAYER_FILES + "admn_adx_py_all_location.lyrx",    # Bird / Navassa Island labels hidden
     LAYER_FILES + "admn_ad1_py_all_reference.lyrx",   # standard CMF label (name + pcode)

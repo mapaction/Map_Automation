@@ -173,7 +173,13 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
      which share one background on the group's own frame (75% opaque);
      legend columns from the page shape; legend items hide layer names, and
      headings unless in `LEGEND_HEADINGS`.
-  7. Fill in the text elements, then export.
+  7. Fill in the text elements (off-page ones, metadata for the map export
+     tool, are moved left if their new text reaches onto the page:
+     `keep_off_page`); replace the on-page donor logo placeholder
+     (picture of `Placeholder_donor_logo.*`) with the `donors` logos from
+     `event_description.json` (`add_donor_logos`: placeholder deleted, new
+     pictures made in its group, sized from each image's shape with Pillow,
+     which ships with Pro). Then export.
   8. After the project is closed, `finish_project_file` edits its
      `GISProject.json` (the `.aprx` is a zip): `clean_project_items` drops
      tool/notebook history, broken and duplicate connections, and moves
@@ -204,7 +210,10 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
 - **Data naming:**
   `geoext_category_theme_geom_scale_source_permission_free`. The source is
   the part before the permission code (the scale part is sometimes missing).
-  `SOURCE_NAMES` maps source codes to the names shown on the map.
+  Its name on the map comes from the project's `06_source.csv` (found via
+  `data_nc_definition` in `cmf_description.json`), else `SOURCE_NAMES`.
+  The live and standard CMF copies of `06_source.csv` differ (the live one
+  lacks `gmted` and `un`); the test copy has the live one.
 
 ## Known gaps / open questions
 
@@ -230,7 +239,14 @@ Set-Location cmf_examples\2026-ven-001\GIS\7_Python\map_automation
 - The `PREFERRED_DATASETS` choices were picked by Claude for testing; confirm
   them with the user.
 - The feather is not yet on the Location map (its `LayerSpec` is commented
-  out).
+  out). Its width was doubled in Nov 2026 (`FEATHER_STEP_PT` 5 to 10) at the
+  user's request.
+- The live `event_description.json` has `"donors": []`, so a live run would
+  remove the logo placeholder rather than show the US flag its maps use.
+  The test copy lists `"the United States"`. Tell the user before a live run.
+- Donor logos are tested on `landscape_a3_marginalia_inside` only. Other
+  layouts' placeholders (`other logo` in the `_bottom`/`_leftside` ones; the
+  A0 layouts have none) are untested.
 - The standard CMF's `carto_fea_py_all.lyrx` still has the old `xpar`
   symbol. The script doesn't need it changed, but the user may want to.
 - The opening tabs and project tidying (step 8) are checked with arcpy only;

@@ -1,3 +1,5 @@
+GIS/2_Active_Data/200_data_name_lookup/06_source.csv
+GIS/2_Active_Data/200_data_name_lookup/data_naming_convention.json
 GIS/2_Active_Data/202_admn/ven_admn_ad0_ln_s1_ine_pp_country.cpg
 GIS/2_Active_Data/202_admn/ven_admn_ad0_ln_s1_ine_pp_country.dbf
 GIS/2_Active_Data/202_admn/ven_admn_ad0_ln_s1_ine_pp_country.prj
@@ -220,6 +222,7 @@ GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/tran_por_pt_worldports.ly
 GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/tran_rds_ln_natearth.lyrx
 GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/tran_rds_ln_natearth_prim-sec.lyrx
 GIS/3_Mapping/31_Resources/312_Layer_files/3121_arcpro/tran_rrd_ln_all.lyrx
+GIS/3_Mapping/31_Resources/315_Logos/US_State_Dept/US_flag__US_State_Dept_specs.png
 GIS/3_Mapping/32_Map_Templates/321_arcpro/arcpro_templates_automation_test.aprx
 GIS/3_Mapping/32_Map_Templates/321_arcpro/landscape_a0_marginalia_inside.pagx
 GIS/3_Mapping/32_Map_Templates/321_arcpro/landscape_a3_marginalia_bottom.pagx

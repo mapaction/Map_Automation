@@ -16,7 +16,8 @@ few questions, then does the rest. For each map it:
 4. fills in the legend and the title, map number, GLIDE number, data sources,
    disclaimer and other text, with white backgrounds behind the legend and
    text boxes (one shared, partly transparent background for the
-   bottom-right marginalia group),
+   bottom-right marginalia group), and puts the donors' logos in place of
+   the layout's donor logo placeholder,
 5. saves the project and exports a JPEG,
 6. tidies the project (removes clutter inherited from the template) and sets
    it to open with the Main map, Location map and layout as tabs, the maps at
@@ -136,7 +137,7 @@ never overwritten by the copy tool:
 
 | File | Change |
 |---|---|
-| `event_description.json` | Language switched to English (`en`); disclaimer and donor credit translated. |
+| `event_description.json` | Language switched to English (`en`); disclaimer and donor credit translated; `donors` set to `["the United States"]` (the live file's list is empty, but its maps show the US flag). |
 | `312_Layer_files/3121_arcpro/admn_adx_py_all_reference.lyrx`, `admn_adx_py_all_location.lyrx` | Bird Island and Navassa Island are not labelled. |
 | `312_Layer_files/3121_arcpro/admn_ad1_py_all_reference.lyrx` | Label expression put back to the standard CMF's `[ADM1_EN] & vbNewLine & [ADM1_PCODE]` (the live copy labels with `[ADM1_PCODE]` only), so the admin label language question can switch it to `ADM1_ES`. |
 | `32_Map_Templates/321_arcpro/arcpro_templates_automation_test.aprx` | Tidied with `tools/clean_template.py`: old tool and notebook history and broken connections (to the project the template was made in) removed; default geodatabase and toolbox set to `GIS/6_Pro_Default_Files`. The script also tidies every project it makes, whatever the template. |
@@ -162,10 +163,36 @@ The script also sets the feather's symbol itself, ignoring the layer file's.
 The standard `carto_fea_py_all.lyrx` was made for older feather data (rings
 around the country, each with an `xpar` transparency field), so it draws the
 toolbox's single polygon as solid white. The script instead uses the symbol
-from the Venezuela response's maps: 21 stacked white fills at 15% opacity,
-each pulled 5 points further from the border, so the fade builds up gradually
-and is almost white about 35 mm from the border. The numbers are
-`FEATHER_STEPS`, `FEATHER_STEP_PT` and `FEATHER_STEP_OPACITY` in the config.
+based on the Venezuela response's maps: 21 stacked white fills at 15%
+opacity, each pulled 10 points further from the border, so the fade builds up
+gradually and is almost white about 70 mm from the border (the Venezuela maps
+used 5-point steps, half as wide). The numbers are `FEATHER_STEPS`,
+`FEATHER_STEP_PT` and `FEATHER_STEP_OPACITY` in the config.
+
+## Donor logos
+
+The layouts have a donor logo placeholder (a picture of
+`315_Logos/Placeholder/Placeholder_donor_logo.JPG`, reading "Replace with
+donor logo"). The script replaces it with the logo of each donor in the
+`donors` list of `event_description.json`, side by side, as large as fits
+in the placeholder's box and aligned as the placeholder was (bottom right on
+`landscape_a3_marginalia_inside`). Placeholders off the page are left alone.
+
+Each donor's logo is found in `GIS/3_Mapping/31_Resources/315_Logos`:
+the file or folder given in `DONOR_LOGOS` in the config, or else the folder
+with the donor's name (ignoring case, punctuation and a leading "the"). From
+a folder, the first `.png` is used, else `.jpg` and so on, RGB rather than
+CMYK. If there are no donors, the placeholder is removed; if a donor's logo
+can't be found, the placeholder stays on the map as a reminder and the
+script says so before building.
+
+## Data source names
+
+The data sources text lists the source part of each dataset's file name
+(e.g. `ourairports`), written out from the project's own list,
+`2_Active_Data/200_data_name_lookup/06_source.csv` (e.g. "Our Airports").
+Sources missing there come from `SOURCE_NAMES` in the config (e.g. `ine` →
+`INE`); sources in neither are shown as they are, with a warning.
 
 ## Running the script
 
@@ -244,7 +271,7 @@ Outputs appear in:
 - `GIS/3_Mapping/33_Map_Projects/<map code>/` (the `.aprx` projects)
 - `GIS/3_Mapping/34_Map_Products_MapAction/<map code>/<version>/` (the JPEGs)
 
-Only the Python standard library and ArcGIS Pro's own `arcpy` are used, so
+Only the Python standard library and what comes with ArcGIS Pro's Python (`arcpy`, and Pillow to read logo sizes) are used, so
 nothing needs installing.
 
 ## Settings
@@ -262,7 +289,8 @@ Everything you are likely to change is in `map_automation_pro_config.py`:
 | `FEATHER_STEPS`, `FEATHER_STEP_PT`, `FEATHER_STEP_OPACITY` | The feather's fade: how many white fills, how far apart (points), and how opaque each is. |
 | `PREFERRED_SUPPLIER`, `PREFERRED_DATASETS` | Which dataset to use when several match a layer. Anything still unclear is asked. |
 | `COUNTRY_NAME` | Country name on the map. `None` reads it from the admin 0 data, in the event language. |
-| `SOURCE_NAMES` | How data sources are written on the map (`naturalearth` → `Natural Earth`). |
+| `SOURCE_NAMES` | How data sources missing from the project's `06_source.csv` are written on the map (`naturalearth` → `Natural Earth`). |
+| `LOGOS_SUBFOLDER`, `LOGO_PLACEHOLDER_IMAGE`, `LOGO_GAP_MM`, `DONOR_LOGOS` | Donor logos: where they are, the placeholder picture they replace, the space between them, and each donor's logo file or folder. |
 | `FRAME_EXTENTS`, `SCALE_ROUNDING_FRACTION` | The layer each map frame is zoomed to and its scale multiplier; the size of the rounding step. |
 | `SCALE_BAR_NAME`, `SCALE_BAR_MIN_WIDTH`, `SCALE_BAR_TEXT_SIZE_FACTOR`, `SCALE_BAR_UNIT_LABEL` | The scale bar: minimum width (fraction of the page), text size and unit label. |
 | `LEGEND_EXCLUDE`, `LEGEND_HEADINGS`, `LEGEND_COLUMNS_LANDSCAPE`, `LEGEND_COLUMNS_PORTRAIT` | Main map layers left out of the legend; headings shown for some layers; legend columns. |
@@ -270,7 +298,7 @@ Everything you are likely to change is in `map_automation_pro_config.py`:
 | `LAYERS`, `MAPS` | Every layer that can be used, and the map products made from them. A `LayerSpec` can hide the affected country (`exclude_affected_country`), show only it (`only_affected_country`, a field with the lower-case ISO3 code) or turn labels off (`labels=False`). A map's `layers` list is its drawing order, top first; the feather is on top. |
 
 Event details (GLIDE number, time zone, language, contact email, disclaimer,
-donor credit, JPEG resolution) come from the project's
+donor credit, donors, JPEG resolution) come from the project's
 `event_description.json`, not from the config.
 
 ## Current state

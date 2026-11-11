@@ -91,7 +91,10 @@ COUNTRY_NAME = None
 
 # How each data source (the lower-case source part of data file names, e.g.
 # ven_admn_ad0_py_s1_<ine>_pp_country.shp) is written in the map's data
-# sources text. Sources missing here are shown as they are, with a warning.
+# sources text. The project's own source list comes first: 06_source.csv in
+# 2_Active_Data/200_data_name_lookup (its Description column). These names
+# are only used for sources missing from it. Sources in neither are shown as
+# they are, with a warning.
 SOURCE_NAMES = {
     "gmted": "GMTED",
     "ine": "INE",
@@ -211,12 +214,38 @@ FEATHER_BACKGROUND = "207_carto/wrl_carto_ext_py_s0_esri_pp_globalBackground.shp
 # The feather's symbol replaces the layer file's: FEATHER_STEPS white fills,
 # each FEATHER_STEP_PT points further from the country's border and
 # FEATHER_STEP_OPACITY percent opaque. They add up, so the fade gets stronger
-# away from the border. These values are the ones used in the 2026-ven-001
-# response's maps (21 steps of 5 pt at 15%: almost white 100 pt, about 35 mm,
-# from the border).
+# away from the border. 21 steps of 10 pt at 15%: almost white 200 pt, about
+# 70 mm, from the border. (The 2026-ven-001 response's maps used 5 pt steps,
+# half as wide.)
 FEATHER_STEPS = 21
-FEATHER_STEP_PT = 5
+FEATHER_STEP_PT = 10
 FEATHER_STEP_OPACITY = 15
+
+# --- Donor logos ----------------------------------------------------------------
+# The layout's donor logo placeholder (a picture of this file name, in
+# 315_Logos/Placeholder) is replaced by the logos of the donors listed in
+# event_description.json ("donors"), side by side and fitted inside the
+# placeholder's box. With no donors listed, the placeholder is removed.
+LOGOS_SUBFOLDER = "315_Logos"   # inside 31_Resources (next to 312_Layer_files)
+LOGO_PLACEHOLDER_IMAGE = "Placeholder_donor_logo"
+LOGO_GAP_MM = 2   # space between logos
+
+# Logo of each donor, as a file or folder inside 315_Logos. Donor names are
+# matched ignoring case, punctuation and a leading "the". A donor not listed
+# here uses the 315_Logos folder of the same name, if there is one (its first
+# .png, else .jpg ... picture, preferring RGB over CMYK).
+DONOR_LOGOS = {
+    "German Federal Foreign Office": "German Federal Foreign Office/ELdZ_UL_en2/JPEG_RGB_600dpi/ELdZ_Uni_rgb_en.jpg",
+    "GFFO": "German Federal Foreign Office/ELdZ_UL_en2/JPEG_RGB_600dpi/ELdZ_Uni_rgb_en.jpg",
+    "FCDO": "DFID-UKAID/ukaid.jpg",
+    "UK aid": "DFID-UKAID/ukaid.jpg",
+    "USAID": "BHA-USAID/usaid.png",
+    "BHA": "BHA-USAID/usaid.png",
+    "United States": "US_State_Dept/US_flag__US_State_Dept_specs.png",
+    "US State Department": "US_State_Dept/US_flag__US_State_Dept_specs.png",
+    "Netherlands Ministry of Foreign Affairs": "Netherlands/MinForeign_Affairs_Netherlands.JPG",
+    "H2H Network": "H2H/H2HNetwork_logo_full_lockup_BLACK_RGB.png",
+}
 
 # The legend lists every Main map layer except these: background layers, and
 # layers whose symbol has no label (or repeats another layer's label).
